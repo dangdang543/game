@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>브레인 비타 - 모바일 최적화</title>
+    <style>
+        :root {
+            /* 모바일 화면 높이에 맞춰 보드 크기 자동 조절 */
+            --cell-size: min(12vw, 50px, 8vh); 
+            --gap-size: 6px;
+        }
+        body { 
+            font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; 
+            display: flex; flex-direction: column; align-items: center; 
+            background-color: #1a1a2e; color: white; margin: 0; 
+            padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;
+            height: 100vh;
+            justify-content: center;
+            touch-action: manipulation; overflow: hidden;
+        }
+        #fireworks {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 100; background: transparent;
+        }
+        h1 { margin: 10px 0 5px 0; font-size: 1.5rem; color: #4cc9f0; z-index: 10; }
+        
+        #modeTag { margin-bottom: 10px; padding: 6px 20px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; background: #e67e22; z-index: 10; }
+        .mode-playing { background: #27ae60 !important; }
+
+        #board { 
+            display: grid; grid-template-columns: repeat(7, var(--cell-size)); 
+            grid-template-rows: repeat(7, var(--cell-size)); 
+            gap: var(--gap-size); background: #16213e; padding: 10px; 
+            border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            position: relative; z-index: 10;
+        }
+        .cell { width: var(--cell-size); height: var(--cell-size); border-radius: 50%; display: flex; justify-content: center; align-items: center; }
+        .hole { background-color: #0f3460; border: 1px solid #1a1a2e; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .peg { 
+            width: 80%; height: 80%; 
+            background: radial-gradient(circle at 30% 30%, #4cc9f0, #4361ee); 
+            border-radius: 50%; box-shadow: 0 3px 6px rgba(0,0,0,0.5); 
+            pointer-events: none; transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+        }
+        .invalid { background-color: transparent; pointer-events: none; }
+        .selected { 
+            background: radial-gradient(circle at 30% 30%, #f72585, #b5179e) !important;
+            transform: scale(1.15); box-shadow: 0 0 15px #f72585; 
+        }
+        #status { margin-top: 10px; font-size: 1rem; font-weight: bold; color: #4cc9f0; height: 1.2em; z-index: 10; }
+
+        /* 하단 버튼 세로 배치 최적화 */
+        .controls { 
+            margin-top: 15px; 
+            display: flex; 
+            flex-direction: column; /* 세로 배치 */
+            gap: 10px; 
+            width: 85%; 
+            max-width: 300px;
+            z-index: 10; 
+        }
+        button { 
+            width: 100%;
+            padding: 15px 0; /* 터치하기 편하도록 높이 확보 */
+            border: none; color: white; border-radius: 12px; 
+            font-size: 1rem; font-weight: bold; cursor: pointer; 
+            transition: transform 0.1s, opacity 0.2s; 
+            box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+        }
+        button:active { transform: translateY(2px); box-shadow: none; }
+        .start-btn { background: #e67e22; }
+        .undo-btn { background: #34495e; }
+        .undo-btn:disabled { opacity: 0.4; pointer-events: none; }
+        .reset-btn { background: #c0392b; }
+
+        .info { margin-top: 12px; font-size: 0.75rem; color: #94a3b8; text-align: center; z-index: 10; padding-bottom: 10px; }
+    </style>
+</head>
+<body>
+    <canvas id="fireworks"></canvas>
+    <h1>BRAIN VITA</h1>
+    <div id="modeTag">배치 모드: 칸을 터치하세요</div>
+    <div id="status">문제를 설계 중...</div>
+    
+    <div id="board"></div>
+    
+    <div class="controls">
+        <button class="start-btn" id="startBtn" onclick="toggleMode()">게임 시작</button>
+        <button class="undo-btn" id="undoBtn" onclick="undo()" disabled>되돌리기</button>
+        <button class="reset-btn" onclick="resetBoard()">초기화 (새 게임)</button>
+    </div>
+    <div class="info">배치 완료 후 '게임 시작'을 눌러주세요.</div>
+
+    <script>
+        // --- 폭죽 시스템 ---
+        const canvas = document.getElementById('fireworks');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.addEventListener('resize', resizeCanvas); resizeCanvas();
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x; this.y = y; this.color = color;
+                this.velocity = { x: (Math.random() - 0.5) * 6, y: (Math.random() - 0.5) * 10 - 4 };
+                this.alpha = 1; this.friction = 0.96; this.gravity = 0.2;
+            }
+            draw() { ctx.save(); ctx.globalAlpha = this.alpha; ctx.beginPath(); ctx.arc(this.x, this.y, 2, 0, Math.PI * 2); ctx.fillStyle = this.color; ctx.fill(); ctx.restore(); }
+            update() { this.velocity.x *= this.friction; this.velocity.y *= this.friction; this.velocity.y += this.gravity; this.x += this.velocity.x; this.y += this.velocity.y; this.alpha -= 0.012; }
+        }
+        function createFirework(x, y) {
+            const colors = ['#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4cc9f0'];
+            for (let i = 0; i < 35; i++) particles.push(new Particle(x, y, colors[Math.floor(Math.random() * colors.length)]));
+        }
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach((p, i) => { if (p.alpha <= 0) particles.splice(i, 1); else { p.update(); p.draw(); } });
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // --- 게임 로직 ---
+        const CENTER = 3;
+        const layoutTemplate = [
+            [0,0,1,1,1,0,0], [0,0,1,1,1,0,0], [1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1], [1,1,1,1,1,1,1], [0,0,1,1,1,0,0], [0,0,1,1,1,0,0]
+        ];
+        let boardState = [];
+        let history = [];
+        let selected = null;
+        let isPlaying = false;
+        let isCleared = false;
+
+        function resetBoard() {
+            boardState = layoutTemplate.map(row => row.map(v => v === 1 ? 2 : 0));
+            isPlaying = false; isCleared = false; history = []; selected = null;
+            const btn = document.getElementById('startBtn');
+            const tag = document.getElementById('modeTag');
+            btn.innerText = "게임 시작";
+            btn.style.background = "#e67e22";
+            tag.innerText = "배치 모드: 칸을 터치하세요";
+            tag.classList.remove('mode-playing');
+            document.getElementById('undoBtn').disabled = true;
+            updateStatus("페그를 클릭하여 배치하세요.");
+            render();
+        }
+
+        function toggleMode() {
+            const btn = document.getElementById('startBtn');
+            const tag = document.getElementById('modeTag');
+            if (!isPlaying) {
+                let count = 0;
+                boardState.forEach(row => row.forEach(v => { if(v===1) count++; }));
+                if (count < 2) { alert("구슬을 2개 이상 배치해 주세요."); return; }
+                isPlaying = true;
+                btn.innerText = "편집 모드로 돌아가기";
+                btn.style.background = "#2980b9";
+                tag.innerText = "게임 모드: 퍼즐 푸는 중";
+                tag.classList.add('mode-playing');
+                updateStatus("남은 구슬: " + count);
+            } else {
+                isPlaying = false; isCleared = false;
+                btn.innerText = "게임 시작";
+                btn.style.background = "#e67e22";
+                tag.innerText = "배치 모드: 칸을 터치하세요";
+                tag.classList.remove('mode-playing');
+                updateStatus("편집 모드입니다.");
+            }
+            selected = null; render();
+        }
+
+        function render() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            for(let r=0; r<7; r++) {
+                for(let c=0; c<7; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    if (boardState[r][c] === 0) cell.classList.add('invalid');
+                    else {
+                        cell.classList.add('hole');
+                        cell.onclick = () => isPlaying ? handlePlayClick(r, c) : handleEditClick(r, c);
+                        if (boardState[r][c] === 1) {
+                            const peg = document.createElement('div');
+                            peg.className = 'peg';
+                            if (selected && selected.r === r && selected.c === c) peg.classList.add('selected');
+                            cell.appendChild(peg);
+                        }
+                    }
+                    board.appendChild(cell);
+                }
+            }
+            document.getElementById('undoBtn').disabled = history.length === 0;
+        }
+
+        function handleEditClick(r, c) {
+            boardState[r][c] = (boardState[r][c] === 1) ? 2 : 1;
+            render();
+        }
+
+        function handlePlayClick(r, c) {
+            if (isCleared) return;
+            if (boardState[r][c] === 1) {
+                selected = {r, c}; render();
+            } else if (boardState[r][c] === 2 && selected) {
+                const dr = r - selected.r, dc = c - selected.c;
+                if ((Math.abs(dr) === 2 && dc === 0) || (Math.abs(dc) === 2 && dr === 0)) {
+                    const mr = (r + selected.r) / 2, mc = (c + selected.c) / 2;
+                    if (boardState[mr][mc] === 1) {
+                        history.push(JSON.stringify(boardState));
+                        boardState[selected.r][selected.c] = 2;
+                        boardState[mr][mc] = 2;
+                        boardState[r][c] = 1;
+                        selected = null; render(); checkWin();
+                        return;
+                    }
+                }
+                selected = null; render();
+            }
+        }
+
+        function checkWin() {
+            let count = 0;
+            boardState.forEach(row => row.forEach(v => { if(v===1) count++; }));
+            if (count === 1) {
+                if (boardState[CENTER][CENTER] === 1) {
+                    updateStatus("축하합니다! 정답입니다!");
+                    isCleared = true;
+                    for(let i=0; i<6; i++) setTimeout(() => createFirework(window.innerWidth/2 + (Math.random()-0.5)*150, window.innerHeight/3 + (Math.random()-0.5)*150), i*300);
+                } else {
+                    updateStatus("성공! (중앙 안착 도전!)");
+                }
+            } else if (!canMove()) {
+                updateStatus("막혔습니다. 되돌려보세요!");
+            } else {
+                updateStatus("남은 구슬: " + count);
+            }
+        }
+
+        function canMove() {
+            for (let r = 0; r < 7; r++) {
+                for (let c = 0; c < 7; c++) {
+                    if (boardState[r][c] === 1) {
+                        const dirs = [[0,2],[0,-2],[2,0],[-2,0]];
+                        for (let d of dirs) {
+                            let nr = r + d[0], nc = c + d[1], mr = r + d[0]/2, mc = c + d[1]/2;
+                            if (nr>=0 && nr<7 && nc>=0 && nc<7 && boardState[nr][nc] === 2 && boardState[mr][mc] === 1) return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        function undo() {
+            if (history.length > 0 && !isCleared) {
+                boardState = JSON.parse(history.pop());
+                selected = null; updateStatus("한 수 되돌림"); render();
+            }
+        }
+
+        function updateStatus(msg) { document.getElementById('status').innerText = msg; }
+
+        resetBoard();
+    </script>
+</body>
+</html>
