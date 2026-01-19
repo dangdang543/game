@@ -3,116 +3,154 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>브레인 비타 - 챌린지 모드</title>
+    <title>브레인 비타 - 폭죽 에디션</title>
     <style>
         :root {
             --cell-size: min(12vw, 50px); 
-            --gap-size: 5px;
+            --gap-size: 6px;
         }
         body { 
             font-family: 'Apple SD Gothic Neo', sans-serif; 
             display: flex; flex-direction: column; align-items: center; 
-            background-color: #2c3e50; color: white; margin: 0; padding-top: 20px;
+            background-color: #1a1a2e; color: white; margin: 0; padding-top: 20px;
             touch-action: manipulation; overflow: hidden;
+        }
+        /* 폭죽 캔버스 */
+        #fireworks {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 100;
         }
         #board { 
             display: grid; grid-template-columns: repeat(7, var(--cell-size)); 
             grid-template-rows: repeat(7, var(--cell-size)); 
-            gap: var(--gap-size); background: #34495e; padding: 10px; 
-            border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            gap: var(--gap-size); background: #16213e; padding: 12px; 
+            border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+            position: relative; z-index: 10;
         }
         .cell { width: var(--cell-size); height: var(--cell-size); border-radius: 50%; display: flex; justify-content: center; align-items: center; }
-        .hole { background-color: #1a252f; border: 1px solid #162129; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .hole { background-color: #0f3460; border: 1px solid #1a1a2e; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         .peg { 
-            width: 80%; height: 80%; 
-            background: radial-gradient(circle at 30% 30%, #3498db, #2980b9); 
-            border-radius: 50%; box-shadow: 0 3px 6px rgba(0,0,0,0.4); 
-            pointer-events: none; transition: transform 0.1s; 
+            width: 82%; height: 82%; 
+            background: radial-gradient(circle at 30% 30%, #4cc9f0, #4361ee); 
+            border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.5); 
+            pointer-events: none; transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
         }
         .invalid { background-color: transparent; pointer-events: none; }
-        .selected { border: 3px solid #ff5252; box-shadow: 0 0 15px #ff5252; transform: scale(1.1); }
-        #status { margin-top: 20px; font-size: 1.2rem; font-weight: bold; color: #f1c40f; text-align: center; height: 1.5em; }
-        .controls { margin-top: 20px; display: flex; gap: 10px; width: 90%; justify-content: center; }
-        button { flex: 1; max-width: 150px; padding: 12px; border: none; color: white; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; }
-        .next-btn { background: #27ae60; }
-        .undo-btn { background: #34495e; border: 1px solid #7f8c8d; }
-        .info { margin-top: 10px; font-size: 0.8rem; color: #bdc3c7; }
+        .selected { 
+            background: radial-gradient(circle at 30% 30%, #f72585, #b5179e) !important;
+            transform: scale(1.2); box-shadow: 0 0 20px #f72585; 
+        }
+        #status { margin-top: 20px; font-size: 1.3rem; font-weight: bold; color: #4cc9f0; text-align: center; height: 1.5em; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .controls { margin-top: 20px; display: flex; gap: 10px; width: 90%; justify-content: center; position: relative; z-index: 10; }
+        button { flex: 1; max-width: 150px; padding: 14px; border: none; color: white; border-radius: 12px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 0 rgba(0,0,0,0.2); }
+        .next-btn { background: #4361ee; }
+        .next-btn:active { transform: translateY(2px); box-shadow: none; }
+        .undo-btn { background: #0f3460; border: 1px solid #4cc9f0; }
+        .info { margin-top: 15px; font-size: 0.85rem; color: #94a3b8; text-align: center; }
     </style>
 </head>
 <body>
-    <h1 style="margin-bottom: 5px;">페그 챌린지</h1>
-    <div id="status">문제를 생성 중...</div>
+    <canvas id="fireworks"></canvas>
+    <h1 style="margin-bottom: 5px; color: #4cc9f0;">BRAIN VITA</h1>
+    <div id="status">문제를 불러오는 중...</div>
     <div id="board"></div>
     
     <div class="controls">
         <button class="undo-btn" onclick="undo()">뒤로가기</button>
         <button class="next-btn" onclick="generateProblem()">다음 문제 (Enter)</button>
     </div>
-    <div class="info">모든 문제는 정중앙에 하나를 남길 수 있습니다.</div>
+    <div class="info">정중앙에 구슬 1개를 남기면 클리어!</div>
 
     <script>
+        const canvas = document.getElementById('fireworks');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x; this.y = y; this.color = color;
+                this.velocity = { x: (Math.random() - 0.5) * 8, y: (Math.random() - 0.5) * 8 };
+                this.alpha = 1; this.friction = 0.95; this.gravity = 0.2;
+            }
+            draw() {
+                ctx.save(); ctx.globalAlpha = this.alpha;
+                ctx.beginPath(); ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = this.color; ctx.fill(); ctx.restore();
+            }
+            update() {
+                this.velocity.x *= this.friction; this.velocity.y *= this.friction;
+                this.velocity.y += this.gravity;
+                this.x += this.velocity.x; this.y += this.velocity.y;
+                this.alpha -= 0.01;
+            }
+        }
+
+        function createFirework(x, y) {
+            const colors = ['#f72585', '#7209b7', '#3a0ca3', '#4361ee', '#4cc9f0'];
+            for (let i = 0; i < 30; i++) {
+                particles.push(new Particle(x, y, colors[Math.floor(Math.random() * colors.length)]));
+            }
+        }
+
+        function animate() {
+            ctx.fillStyle = 'rgba(26, 26, 46, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            particles.forEach((p, i) => {
+                if (p.alpha <= 0) particles.splice(i, 1);
+                else { p.update(); p.draw(); }
+            });
+            requestAnimationFrame(animate);
+        }
+        animate();
+
+        // 게임 로직
         const BOARD_SIZE = 7;
         const CENTER = 3;
-        // 0: 무효, 1: 페그, 2: 구멍
-        const baseLayout = [
+        const layoutTemplate = [
             [0,0,1,1,1,0,0], [0,0,1,1,1,0,0], [1,1,1,1,1,1,1],
             [1,1,1,1,1,1,1], [1,1,1,1,1,1,1], [0,0,1,1,1,0,0], [0,0,1,1,1,0,0]
         ];
-
         let boardState = [];
         let history = [];
         let selected = null;
         let isCleared = false;
 
-        // 역추적을 통한 문제 생성 (정답이 보장됨)
         function generateProblem() {
-            // 1. 모든 칸을 구멍(2)으로 채우고 중앙만 페그(1) 배치
-            boardState = JSON.parse(JSON.stringify(baseLayout)).map(row => row.map(v => v === 1 ? 2 : 0));
-            boardState[CENTER][CENTER] = 1; 
-
-            const moves = [[0,1], [0,-1], [1,0], [-1,0]];
-            let steps = 0;
-            const targetSteps = 15 + Math.floor(Math.random() * 10); // 난이도 조절
-
-            while (steps < targetSteps) {
-                let r = Math.floor(Math.random() * BOARD_SIZE);
-                let c = Math.floor(Math.random() * BOARD_SIZE);
-
-                if (boardState[r][c] === 1) { // 페그가 있는 곳에서 역으로 점프
-                    let dir = moves[Math.floor(Math.random() * 4)];
-                    let nr = r + dir[0] * 2;
-                    let nc = c + dir[1] * 2;
-                    let mr = r + dir[0];
-                    let mc = c + dir[1];
-
-                    if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE &&
-                        boardState[nr][nc] === 2 && boardState[mr][mc] === 2) {
-                        // 역점프: 원래 있던 페그를 치우고, 건너편과 중간에 페그를 놓음
-                        boardState[r][c] = 2;
-                        boardState[mr][mc] = 1;
-                        boardState[nr][nc] = 1;
-                        steps++;
-                    }
+            boardState = layoutTemplate.map(row => row.map(v => v === 1 ? 2 : 0));
+            boardState[CENTER][CENTER] = 1;
+            const directions = [[0,1], [0,-1], [1,0], [-1,0]];
+            let movesMade = 0;
+            for (let i = 0; i < 120; i++) {
+                let pegs = [];
+                for(let r=0; r<7; r++) for(let c=0; c<7; c++) if(boardState[r][c] === 1) pegs.push({r, c});
+                let {r, c} = pegs[Math.floor(Math.random() * pegs.length)];
+                let dir = directions[Math.floor(Math.random() * 4)];
+                let mr = r + dir[0], mc = c + dir[1], nr = r + dir[0]*2, nc = c + dir[1]*2;
+                if (nr >= 0 && nr < 7 && nc >= 0 && nc < 7 && boardState[nr][nc] === 2 && boardState[mr][mc] === 2 && layoutTemplate[nr][nc] === 1 && layoutTemplate[mr][mc] === 1) {
+                    boardState[r][c] = 2; boardState[mr][mc] = 1; boardState[nr][nc] = 1; movesMade++;
                 }
             }
-            
-            history = [];
-            selected = null;
-            isCleared = false;
-            updateStatus("새로운 문제! 중앙에 하나를 남기세요.");
-            render();
+            if (movesMade < 12) return generateProblem();
+            history = []; selected = null; isCleared = false;
+            updateStatus("새로운 도전!"); render();
         }
 
         function render() {
             const board = document.getElementById('board');
             board.innerHTML = '';
-            for(let r=0; r<BOARD_SIZE; r++) {
-                for(let c=0; c<BOARD_SIZE; c++) {
+            for(let r=0; r<7; r++) {
+                for(let c=0; c<7; c++) {
                     const cell = document.createElement('div');
                     cell.className = 'cell';
-                    if (boardState[r][c] === 0) {
-                        cell.classList.add('invalid');
-                    } else {
+                    if (boardState[r][c] === 0) cell.classList.add('invalid');
+                    else {
                         cell.classList.add('hole');
                         cell.onclick = () => handleClick(r, c);
                         if (boardState[r][c] === 1) {
@@ -129,70 +167,76 @@
 
         function handleClick(r, c) {
             if (isCleared) return;
-
             if (boardState[r][c] === 1) {
                 selected = {r, c};
                 render();
             } else if (boardState[r][c] === 2 && selected) {
-                const dr = r - selected.r;
-                const dc = c - selected.c;
-                
+                const dr = r - selected.r, dc = c - selected.c;
                 if ((Math.abs(dr) === 2 && dc === 0) || (Math.abs(dc) === 2 && dr === 0)) {
-                    const mr = (r + selected.r) / 2;
-                    const mc = (c + selected.c) / 2;
-                    
+                    const mr = (r + selected.r) / 2, mc = (c + selected.c) / 2;
                     if (boardState[mr][mc] === 1) {
                         history.push(JSON.stringify(boardState));
                         boardState[selected.r][selected.c] = 2;
                         boardState[mr][mc] = 2;
                         boardState[r][c] = 1;
                         selected = null;
-                        checkWin();
                         render();
+                        checkWin();
                         return;
                     }
                 }
-                selected = null;
-                render();
+                selected = null; render();
             }
-        }
-
-        function undo() {
-            if (history.length > 0 && !isCleared) {
-                boardState = JSON.parse(history.pop());
-                selected = null;
-                updateStatus("한 수 되돌렸습니다.");
-                render();
-            }
-        }
-
-        function updateStatus(msg) {
-            document.getElementById('status').innerText = msg;
         }
 
         function checkWin() {
             let count = 0;
             boardState.forEach(row => row.forEach(v => { if(v===1) count++; }));
-            
             if (count === 1) {
                 if (boardState[CENTER][CENTER] === 1) {
                     updateStatus("축하합니다! 정답입니다!");
                     isCleared = true;
+                    // 승리 폭죽 효과!
+                    for(let i=0; i<8; i++) {
+                        setTimeout(() => {
+                            createFirework(Math.random() * canvas.width, Math.random() * canvas.height);
+                        }, i * 200);
+                    }
                 } else {
-                    updateStatus("하나만 남았지만 중앙이 아니에요.");
+                    updateStatus("중앙이 아니에요 ㅠ.ㅠ");
                 }
+            } else if (!canMove()) {
+                updateStatus("막혔습니다! 뒤로 가보세요.");
             } else {
                 updateStatus("남은 구슬: " + count);
             }
         }
 
-        // 엔터 키 이벤트 리스너
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                generateProblem();
+        function canMove() {
+            for (let r = 0; r < 7; r++) {
+                for (let c = 0; c < 7; c++) {
+                    if (boardState[r][c] === 1) {
+                        const dirs = [[0,2],[0,-2],[2,0],[-2,0]];
+                        for (let d of dirs) {
+                            let nr = r + d[0], nc = c + d[1], mr = r + d[0]/2, mc = c + d[1]/2;
+                            if (nr>=0 && nr<7 && nc>=0 && nc<7 && boardState[nr][nc] === 2 && boardState[mr][mc] === 1) return true;
+                        }
+                    }
+                }
             }
-        });
+            return false;
+        }
 
+        function undo() {
+            if (history.length > 0 && !isCleared) {
+                boardState = JSON.parse(history.pop());
+                selected = null; updateStatus("한 수 무르기"); render();
+            }
+        }
+
+        function updateStatus(msg) { document.getElementById('status').innerText = msg; }
+
+        window.addEventListener('keydown', (e) => { if (e.key === 'Enter') generateProblem(); });
         generateProblem();
     </script>
 </body>
