@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>브레인 비타 - 역방향 설계</title>
+    <style>
+        :root {
+            --cell-size: min(12vw, 50px, 8vh); 
+            --gap-size: 6px;
+        }
+        body { 
+            font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; 
+            display: flex; flex-direction: column; align-items: center; 
+            background-color: #1a1a2e; color: white; margin: 0; 
+            padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;
+            height: 100vh; justify-content: center; touch-action: manipulation; overflow: hidden;
+        }
+        #fireworks { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+        h1 { margin: 10px 0 5px 0; font-size: 1.5rem; color: #f72585; z-index: 10; }
+        
+        #modeTag { margin-bottom: 10px; padding: 6px 20px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; background: #7209b7; z-index: 10; }
+
+        #board { 
+            display: grid; grid-template-columns: repeat(7, var(--cell-size)); 
+            grid-template-rows: repeat(7, var(--cell-size)); 
+            gap: var(--gap-size); background: #16213e; padding: 10px; 
+            border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            position: relative; z-index: 10;
+        }
+        .cell { width: var(--cell-size); height: var(--cell-size); border-radius: 50%; display: flex; justify-content: center; align-items: center; }
+        .hole { background-color: #0f3460; border: 1px solid #1a1a2e; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .peg { 
+            width: 80%; height: 80%; 
+            background: radial-gradient(circle at 30% 30%, #f72585, #b5179e); 
+            border-radius: 50%; box-shadow: 0 3px 6px rgba(0,0,0,0.5); 
+            pointer-events: none; transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+        }
+        .invalid { background-color: transparent; pointer-events: none; }
+        .selected { 
+            background: radial-gradient(circle at 30% 30%, #4cc9f0, #4361ee) !important;
+            transform: scale(1.15); box-shadow: 0 0 15px #4cc9f0; 
+        }
+        #status { margin-top: 10px; font-size: 1rem; font-weight: bold; color: #f72585; height: 1.2em; z-index: 10; }
+
+        .controls { margin-top: 15px; display: flex; flex-direction: column; gap: 10px; width: 85%; max-width: 300px; z-index: 10; }
+        button { 
+            width: 100%; padding: 15px 0; border: none; color: white; border-radius: 12px; 
+            font-size: 1rem; font-weight: bold; cursor: pointer; transition: transform 0.1s; 
+        }
+        .undo-btn { background: #34495e; }
+        .reset-btn { background: #c0392b; }
+
+        .info { margin-top: 12px; font-size: 0.75rem; color: #94a3b8; text-align: center; z-index: 10; }
+    </style>
+</head>
+<body>
+    <canvas id="fireworks"></canvas>
+    <h1>REVERSE VITA</h1>
+    <div id="modeTag">역방향 설계 모드</div>
+    <div id="status">중앙에서 시작하세요!</div>
+    
+    <div id="board"></div>
+    
+    <div class="controls">
+        <button class="undo-btn" id="undoBtn" onclick="undo()" disabled>한 수 되돌리기</button>
+        <button class="reset-btn" onclick="resetBoard()">초기화 (중앙 1개)</button>
+    </div>
+    <div class="info">구슬을 선택해 빈 곳으로 점프하세요.<br>지나온 길에 구슬이 생성됩니다.</div>
+
+    <script>
+        const CENTER = 3;
+        const layoutTemplate = [
+            [0,0,1,1,1,0,0], [0,0,1,1,1,0,0], [1,1,1,1,1,1,1],
+            [1,1,1,1,1,1,1], [1,1,1,1,1,1,1], [0,0,1,1,1,0,0], [0,0,1,1,1,0,0]
+        ];
+        let boardState = [];
+        let history = [];
+        let selected = null;
+
+        function resetBoard() {
+            // 기본 레이아웃에서 중앙에만 구슬(1)을 두고 나머지는 빈 구멍(2)
+            boardState = layoutTemplate.map((row, r) => 
+                row.map((v, c) => (v === 1) ? (r === CENTER && c === CENTER ? 1 : 2) : 0)
+            );
+            history = []; selected = null;
+            updateStatus("설계를 시작하세요.");
+            render();
+        }
+
+        function render() {
+            const board = document.getElementById('board');
+            board.innerHTML = '';
+            for(let r=0; r<7; r++) {
+                for(let c=0; c<7; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    if (boardState[r][c] === 0) cell.classList.add('invalid');
+                    else {
+                        cell.classList.add('hole');
+                        cell.onclick = () => handleClick(r, c);
+                        if (boardState[r][c] === 1) {
+                            const peg = document.createElement('div');
+                            peg.className = 'peg';
+                            if (selected && selected.r === r && selected.c === c) peg.classList.add('selected');
+                            cell.appendChild(peg);
+                        }
+                    }
+                    board.appendChild(cell);
+                }
+            }
+            document.getElementById('undoBtn').disabled = history.length === 0;
+        }
+
+        function handleClick(r, c) {
+            // 구슬 선택
+            if (boardState[r][c] === 1) {
+                selected = {r, c}; render();
+            } 
+            // 빈 구멍으로 점프 (역방향 로직)
+            else if (boardState[r][c] === 2 && selected) {
+                const dr = r - selected.r, dc = c - selected.c;
+                // 두 칸 거리인지 확인
+                if ((Math.abs(dr) === 2 && dc === 0) || (Math.abs(dc) === 2 && dr === 0)) {
+                    const mr = (r + selected.r) / 2, mc = (c + selected.c) / 2;
+                    
+                    // 역방향 조건: 중간 칸과 도착 칸이 모두 비어있어야 함
+                    if (boardState[mr][mc] === 2 && boardState[r][c] === 2) {
+                        history.push(JSON.stringify(boardState));
+                        // 이동 로직: 출발지 유지(또는 선택), 중간 채움, 목적지 채움
+                        // 솔리테어 역순은 '1이 00을 지나 111이 되는 과정'
+                        boardState[selected.r][selected.c] = 2; // 원래 자리는 비우고 (이동)
+                        boardState[mr][mc] = 1;                // 중간은 생성
+                        boardState[r][c] = 1;                 // 목적지도 생성
+                        
+                        selected = null; render();
+                        let count = 0;
+                        boardState.forEach(row => row.forEach(v => { if(v===1) count++; }));
+                        updateStatus("현재 구슬: " + count + "개");
+                    }
+                }
+                selected = null; render();
+            }
+        }
+
+        function undo() {
+            if (history.length > 0) {
+                boardState = JSON.parse(history.pop());
+                selected = null; render();
+                let count = 0;
+                boardState.forEach(row => row.forEach(v => { if(v===1) count++; }));
+                updateStatus("되돌림 (구슬: " + count + "개)");
+            }
+        }
+
+        function updateStatus(msg) { document.getElementById('status').innerText = msg; }
+
+        resetBoard();
+    </script>
+</body>
+</html>
