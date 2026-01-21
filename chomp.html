@@ -2,99 +2,94 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>초콜릿 촘프 - 커스텀 모드</title>
+    <title>초콜릿 촘프 - 레이아웃 고정 버전</title>
     <style>
-        body {
-            font-family: 'Malgun Gothic', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background-color: #f5f0e6;
-            padding-top: 20px;
-        }
+        body { font-family: 'Malgun Gothic', sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f5f0e6; padding-top: 20px; }
         h1 { color: #5d4037; }
-        #menu {
-            background: white;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        
+        /* 메뉴 및 게임 영역 고정 너비 설정으로 흔들림 방지 */
+        #menu, #game-area { 
+            background: white; 
+            padding: 25px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
             text-align: center;
+            min-width: 400px; /* 고정 최소 너비 */
         }
-        .setting-group { margin-bottom: 20px; }
-        .setting-group label { display: block; margin-bottom: 8px; font-weight: bold; color: #5d4037; }
-        input[type="number"] {
-            width: 60px;
-            padding: 5px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            text-align: center;
+
+        #status { 
+            margin: 15px; 
+            font-size: 1.3rem; 
+            font-weight: bold; 
+            color: #d32f2f; 
+            min-height: 1.5em; /* 텍스트 내용에 상관없이 높이 유지 */
         }
-        #status { margin: 15px; font-size: 1.3rem; font-weight: bold; color: #795548; }
-        #grid {
-            display: grid;
-            gap: 5px;
+
+        /* 그리드 영역 설정 */
+        #grid-container {
+            display: inline-block;
             background-color: #3e2723;
             padding: 15px;
             border-radius: 8px;
-            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
             margin-bottom: 20px;
-            max-width: 90vw;
-            overflow: auto;
         }
-        .cell {
-            width: 50px;
-            height: 50px;
-            background-color: #8d6e63;
-            border-radius: 3px;
-            cursor: pointer;
-            transition: 0.2s;
+
+        #grid { 
+            display: grid; 
+            gap: 5px; 
+            /* JavaScript에서 설정할 grid-template-columns의 크기 변화를 방지 */
         }
-        .cell:hover:not(.eaten) { background-color: #a1887f; }
-        .cell.eaten { background-color: rgba(255,255,255,0.1); cursor: default; }
+
+        .cell { 
+            width: 50px; 
+            height: 50px; 
+            background-color: #8d6e63; 
+            border-radius: 3px; 
+            cursor: pointer; 
+            transition: opacity 0.3s ease; /* 부드럽게 사라지는 효과 */
+        }
+
+        /* 먹은 조각 처리: 자리를 유지하되 보이지 않게 설정 */
+        .cell.eaten { 
+            opacity: 0; 
+            cursor: default; 
+            pointer-events: none; /* 클릭 방지 */
+        }
+
         .cell.poison { background-color: #d32f2f; position: relative; }
-        .cell.poison::after {
-            content: "☠️"; position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%); font-size: 1.2rem;
-        }
-        button {
-            padding: 10px 25px;
-            font-size: 1rem;
-            background-color: #5d4037;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: 0.2s;
-        }
+        .cell.poison::after { content: "☠️"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2rem; }
+        
+        button { padding: 10px 25px; font-size: 1rem; background-color: #5d4037; color: white; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
         button:hover { background-color: #3e2723; }
         .hidden { display: none; }
     </style>
 </head>
 <body>
 
-    <h1>Chomp Game</h1>
+    <h1>Chomp</h1>
 
     <div id="menu">
-        <div class="setting-group">
-            <label>판 크기 설정 (행 x 열)</label>
-            <input type="number" id="rows" value="5" min="2" max="10"> x 
-            <input type="number" id="cols" value="7" min="2" max="15">
+        <div style="margin-bottom: 15px;">
+            <label>판 크기: </label>
+            <input type="number" id="rows" value="4" min="2" max="6" style="width:50px;"> x 
+            <input type="number" id="cols" value="5" min="2" max="6" style="width:50px;">
         </div>
-        <div class="setting-group">
-            <label>게임 모드 선택</label>
-            <button onclick="setupGame('PVP')">사람 vs 사람</button>
-            <button onclick="setupGame('PVC')">사람 vs 컴퓨터</button>
-        </div>
+        <button onclick="setupGame('PVP')">사람 vs 사람</button>
+        <button onclick="setupGame('PVC')">사람 vs 컴퓨터 </button>
     </div>
 
     <div id="game-area" class="hidden">
         <div id="status"></div>
-        <div id="grid"></div>
+        <div id="grid-container">
+            <div id="grid"></div>
+        </div>
+        <br>
         <button onclick="backToMenu()">메뉴로 돌아가기</button>
     </div>
 
     <script>
         let ROWS, COLS, currentPlayer, gameOver, gameMode;
+        let memo = new Map();
 
         const gridElement = document.getElementById('grid');
         const statusElement = document.getElementById('status');
@@ -102,19 +97,21 @@
         const gameArea = document.getElementById('game-area');
 
         function setupGame(mode) {
-            ROWS = parseInt(document.getElementById('rows').value) || 5;
-            COLS = parseInt(document.getElementById('cols').value) || 7;
+            ROWS = parseInt(document.getElementById('rows').value);
+            COLS = parseInt(document.getElementById('cols').value);
             gameMode = mode;
             currentPlayer = 1;
             gameOver = false;
+            memo.clear();
 
-            // 그리드 레이아웃 설정
+            // 그리드 레이아웃 고정
             gridElement.style.gridTemplateColumns = `repeat(${COLS}, 50px)`;
+            gridElement.style.width = `${COLS * 50 + (COLS - 1) * 5}px`;
+            gridElement.style.height = `${ROWS * 50 + (ROWS - 1) * 5}px`;
             
             menuElement.classList.add('hidden');
             gameArea.classList.remove('hidden');
-            statusElement.innerText = "플레이어 1의 차례입니다!";
-            
+            statusElement.innerText = "당신의 차례입니다!";
             createBoard();
         }
 
@@ -123,10 +120,8 @@
             for (let r = 0; r < ROWS; r++) {
                 for (let c = 0; c < COLS; c++) {
                     const cell = document.createElement('div');
-                    cell.classList.add('cell');
-                    if (r === 0 && c === 0) cell.classList.add('poison');
-                    cell.dataset.row = r;
-                    cell.dataset.col = c;
+                    cell.className = 'cell' + (r === ROWS - 1 && c === 0 ? ' poison' : '');
+                    cell.dataset.row = r; cell.dataset.col = c;
                     cell.onclick = () => handleChomp(r, c);
                     gridElement.appendChild(cell);
                 }
@@ -135,60 +130,86 @@
 
         function handleChomp(r, c) {
             if (gameOver || (gameMode === 'PVC' && currentPlayer === 2)) return;
-            
             const target = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
             if (target.classList.contains('eaten')) return;
 
             processMove(r, c);
 
             if (!gameOver && gameMode === 'PVC' && currentPlayer === 2) {
-                statusElement.innerText = "컴퓨터가 고민 중...";
-                setTimeout(computerTurn, 700);
+                statusElement.innerText = "컴퓨터가 최적의 수를 계산 중...";
+                setTimeout(proComputerTurn, 600);
             }
         }
 
         function processMove(row, col) {
-            const cells = document.querySelectorAll('.cell');
-            cells.forEach(cell => {
+            document.querySelectorAll('.cell').forEach(cell => {
                 const r = parseInt(cell.dataset.row);
                 const c = parseInt(cell.dataset.col);
-                if (r >= row && c >= col) {
-                    cell.classList.add('eaten');
-                }
+                if (r <= row && c >= col) cell.classList.add('eaten');
             });
 
-            if (row === 0 && col === 0) {
-                const loserName = (gameMode === 'PVC' && currentPlayer === 2) ? "컴퓨터" : `플레이어 ${currentPlayer}`;
-                statusElement.innerText = `💥 ${loserName}가 독초코를 먹었습니다!`;
+            if (row === ROWS - 1 && col === 0) {
+                statusElement.innerText = (currentPlayer === 1 ? "당신" : "컴퓨터") + "이 독을 먹었습니다!";
                 gameOver = true;
                 return;
             }
 
             currentPlayer = currentPlayer === 1 ? 2 : 1;
-            const nextName = (gameMode === 'PVC' && currentPlayer === 2) ? "컴퓨터" : `플레이어 ${currentPlayer}`;
-            statusElement.innerText = `${nextName}의 차례입니다.`;
+            statusElement.innerText = (currentPlayer === 1 ? "당신" : "컴퓨터") + "의 차례입니다.";
         }
 
-        function computerTurn() {
-            if (gameOver) return;
-            const available = [];
-            document.querySelectorAll('.cell:not(.eaten)').forEach(cell => {
-                const r = parseInt(cell.dataset.row);
-                const c = parseInt(cell.dataset.col);
-                if (r !== 0 || c !== 0) available.push({r, c});
-            });
-
-            const choice = available.length > 0 
-                ? available[Math.floor(Math.random() * available.length)] 
-                : {r: 0, c: 0};
-            
-            processMove(choice.r, choice.c);
+        // --- AI 로직 ---
+        function getBoardState() {
+            let heights = new Array(COLS).fill(0);
+            for (let c = 0; c < COLS; c++) {
+                for (let r = 0; r < ROWS; r++) {
+                    const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
+                    if (!cell.classList.contains('eaten')) {
+                        heights[c] = ROWS - r;
+                        break;
+                    }
+                }
+            }
+            return heights.join(',');
         }
 
-        function backToMenu() {
-            menuElement.classList.remove('hidden');
-            gameArea.classList.add('hidden');
+        function canWin(stateStr) {
+            if (stateStr === "1" + ",0".repeat(COLS-1)) return false;
+            if (memo.has(stateStr)) return memo.get(stateStr);
+            let heights = stateStr.split(',').map(Number);
+            for (let c = 0; c < COLS; c++) {
+                for (let h = 1; h <= heights[c]; h++) {
+                    if (c === 0 && h === 1) continue;
+                    let nextHeights = [...heights];
+                    let r = ROWS - h;
+                    for (let nc = c; nc < COLS; nc++) nextHeights[nc] = Math.min(nextHeights[nc], ROWS - r - 1);
+                    if (!canWin(nextHeights.join(','))) {
+                        memo.set(stateStr, {r: ROWS - h, c: c});
+                        return {r: ROWS - h, c: c};
+                    }
+                }
+            }
+            memo.set(stateStr, false);
+            return false;
         }
+
+        function proComputerTurn() {
+            const currentState = getBoardState();
+            const bestMove = canWin(currentState);
+            if (bestMove) processMove(bestMove.r, bestMove.c);
+            else {
+                const available = [];
+                document.querySelectorAll('.cell:not(.eaten)').forEach(cell => {
+                    const r = parseInt(cell.dataset.row);
+                    const c = parseInt(cell.dataset.col);
+                    if (r !== ROWS - 1 || c !== 0) available.push({r, c});
+                });
+                const choice = available.length > 0 ? available[0] : {r: ROWS-1, c: 0};
+                processMove(choice.r, choice.c);
+            }
+        }
+
+        function backToMenu() { menuElement.classList.remove('hidden'); gameArea.classList.add('hidden'); }
     </script>
 </body>
 </html>
