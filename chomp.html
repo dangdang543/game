@@ -2,80 +2,146 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>초콜릿 촘프 - 레이아웃 고정 버전</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>초콜릿 촘프 - 모바일 프로 버전</title>
     <style>
-        body { font-family: 'Malgun Gothic', sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f5f0e6; padding-top: 20px; }
-        h1 { color: #5d4037; }
+        /* 모바일 전체 배경 및 폰트 설정 */
+        body { 
+            font-family: 'Malgun Gothic', sans-serif; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            background-color: #f5f0e6; 
+            margin: 0;
+            padding: 20px 10px;
+            touch-action: manipulation; /* 더블탭 확대 방지 */
+        }
         
-        /* 메뉴 및 게임 영역 고정 너비 설정으로 흔들림 방지 */
+        h1 { color: #5d4037; font-size: 2rem; margin-bottom: 20px; }
+        
+        /* 설정창 및 게임창 크기 대폭 확대 */
         #menu, #game-area { 
             background: white; 
-            padding: 25px; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            padding: 30px 20px; 
+            border-radius: 15px; 
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1); 
             text-align: center;
-            min-width: 400px; /* 고정 최소 너비 */
+            width: 100%;
+            max-width: 450px; /* 모바일 폭에 맞춤 */
+            box-sizing: border-box;
+        }
+
+        /* 크기 설정 항목 디자인 강화 */
+        .setting-group { margin-bottom: 25px; }
+        .setting-group label { 
+            display: block; 
+            font-size: 1.4rem; 
+            font-weight: bold; 
+            color: #5d4037; 
+            margin-bottom: 15px; 
+        }
+
+        /* 입력창(Input) 크기 키우기 */
+        input[type="number"] {
+            width: 80px;
+            height: 50px;
+            font-size: 1.5rem;
+            border: 2px solid #8d6e63;
+            border-radius: 10px;
+            text-align: center;
+            color: #5d4037;
+            background-color: #fff;
         }
 
         #status { 
-            margin: 15px; 
-            font-size: 1.3rem; 
+            margin: 20px 0; 
+            font-size: 1.4rem; 
             font-weight: bold; 
             color: #d32f2f; 
-            min-height: 1.5em; /* 텍스트 내용에 상관없이 높이 유지 */
+            min-height: 1.6em;
         }
 
-        /* 그리드 영역 설정 */
+        /* 초콜릿 판 컨테이너 */
         #grid-container {
             display: inline-block;
             background-color: #3e2723;
-            padding: 15px;
-            border-radius: 8px;
+            padding: 12px;
+            border-radius: 10px;
             margin-bottom: 20px;
+            max-width: 100%;
+            overflow-x: auto; /* 화면보다 클 경우 스크롤 */
         }
 
         #grid { 
             display: grid; 
-            gap: 5px; 
-            /* JavaScript에서 설정할 grid-template-columns의 크기 변화를 방지 */
+            gap: 6px; 
+            margin: 0 auto;
         }
 
+        /* 초콜릿 조각 크기 확대 (터치 최적화) */
         .cell { 
-            width: 50px; 
-            height: 50px; 
+            width: 55px; 
+            height: 55px; 
             background-color: #8d6e63; 
-            border-radius: 3px; 
+            border-radius: 5px; 
             cursor: pointer; 
-            transition: opacity 0.3s ease; /* 부드럽게 사라지는 효과 */
+            transition: opacity 0.3s ease;
+            -webkit-tap-highlight-color: transparent; /* 터치 시 파란 박스 제거 */
         }
 
-        /* 먹은 조각 처리: 자리를 유지하되 보이지 않게 설정 */
         .cell.eaten { 
             opacity: 0; 
-            cursor: default; 
-            pointer-events: none; /* 클릭 방지 */
+            pointer-events: none; 
         }
 
         .cell.poison { background-color: #d32f2f; position: relative; }
-        .cell.poison::after { content: "☠️"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2rem; }
+        .cell.poison::after { 
+            content: "☠️"; 
+            position: absolute; 
+            top: 50%; left: 50%; 
+            transform: translate(-50%, -50%); 
+            font-size: 1.5rem; 
+        }
         
-        button { padding: 10px 25px; font-size: 1rem; background-color: #5d4037; color: white; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
-        button:hover { background-color: #3e2723; }
+        /* 버튼 크기 확대 및 모바일 스타일링 */
+        button { 
+            width: 100%;
+            padding: 15px; 
+            font-size: 1.2rem; 
+            font-weight: bold;
+            background-color: #5d4037; 
+            color: white; 
+            border: none; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            margin: 10px 0;
+            transition: background 0.2s;
+        }
+        button:active { background-color: #3e2723; transform: scale(0.98); }
         .hidden { display: none; }
+
+        @media (max-width: 400px) {
+            .cell { width: 45px; height: 45px; } /* 아주 작은 화면 대응 */
+        }
     </style>
 </head>
 <body>
 
-    <h1>Chomp</h1>
+    <h1>Chomp Mobile</h1>
 
     <div id="menu">
-        <div style="margin-bottom: 15px;">
-            <label>판 크기: </label>
-            <input type="number" id="rows" value="4" min="2" max="6" style="width:50px;"> x 
-            <input type="number" id="cols" value="5" min="2" max="6" style="width:50px;">
+        <div class="setting-group">
+            <label>🍫 초콜릿 판 크기 설정</label>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 15px;">
+                <input type="number" id="rows" value="4" min="2" max="6">
+                <span style="font-size: 1.5rem; font-weight: bold;">X</span>
+                <input type="number" id="cols" value="5" min="2" max="6">
+            </div>
+            <p style="color: #888; margin-top: 10px;">(추천: 6x6 이하)</p>
         </div>
+        
         <button onclick="setupGame('PVP')">사람 vs 사람</button>
-        <button onclick="setupGame('PVC')">사람 vs 컴퓨터 </button>
+        <button onclick="setupGame('PVC')">컴퓨터와 대결 </button>
     </div>
 
     <div id="game-area" class="hidden">
@@ -83,8 +149,7 @@
         <div id="grid-container">
             <div id="grid"></div>
         </div>
-        <br>
-        <button onclick="backToMenu()">메뉴로 돌아가기</button>
+        <button onclick="backToMenu()" style="background-color: #8d6e63;">메뉴로 돌아가기</button>
     </div>
 
     <script>
@@ -104,10 +169,10 @@
             gameOver = false;
             memo.clear();
 
-            // 그리드 레이아웃 고정
-            gridElement.style.gridTemplateColumns = `repeat(${COLS}, 50px)`;
-            gridElement.style.width = `${COLS * 50 + (COLS - 1) * 5}px`;
-            gridElement.style.height = `${ROWS * 50 + (ROWS - 1) * 5}px`;
+            // 셀 크기 55px + 간격 6px 기준 고정
+            const cellSize = (window.innerWidth < 400) ? 45 : 55;
+            gridElement.style.gridTemplateColumns = `repeat(${COLS}, ${cellSize}px)`;
+            gridElement.style.width = `${COLS * cellSize + (COLS - 1) * 6}px`;
             
             menuElement.classList.add('hidden');
             gameArea.classList.remove('hidden');
@@ -136,7 +201,7 @@
             processMove(r, c);
 
             if (!gameOver && gameMode === 'PVC' && currentPlayer === 2) {
-                statusElement.innerText = "컴퓨터가 최적의 수를 계산 중...";
+                statusElement.innerText = "컴퓨터가 생각 중...";
                 setTimeout(proComputerTurn, 600);
             }
         }
@@ -149,13 +214,13 @@
             });
 
             if (row === ROWS - 1 && col === 0) {
-                statusElement.innerText = (currentPlayer === 1 ? "당신" : "컴퓨터") + "이 독을 먹었습니다!";
+                statusElement.innerText = (currentPlayer === 1 ? "당신" : "컴퓨터") + " 패배! 💀";
                 gameOver = true;
                 return;
             }
 
             currentPlayer = currentPlayer === 1 ? 2 : 1;
-            statusElement.innerText = (currentPlayer === 1 ? "당신" : "컴퓨터") + "의 차례입니다.";
+            statusElement.innerText = (currentPlayer === 1 ? "당신" : "컴퓨터") + "의 차례";
         }
 
         // --- AI 로직 ---
