@@ -3,278 +3,193 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>초콜릿 촘프 - 모바일 프로 버전</title>
+    <title>Chomp Pro - 7x7 Optimized</title>
     <style>
-        /* 모바일 전체 배경 및 폰트 설정 */
         body { 
             font-family: 'Malgun Gothic', sans-serif; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            background-color: #f5f0e6; 
-            margin: 0;
-            padding: 20px 10px;
-            touch-action: manipulation; /* 더블탭 확대 방지 */
+            display: flex; flex-direction: column; align-items: center; 
+            background-color: #f5f0e6; margin: 0; padding: 20px 10px;
+            touch-action: manipulation;
         }
-        
-        h1 { color: #5d4037; font-size: 2rem; margin-bottom: 20px; }
-        
-        /* 설정창 및 게임창 크기 대폭 확대 */
+        h1 { color: #5d4037; font-size: 1.8rem; margin-bottom: 15px; }
         #menu, #game-area { 
-            background: white; 
-            padding: 30px 20px; 
-            border-radius: 15px; 
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1); 
-            text-align: center;
-            width: 100%;
-            max-width: 450px; /* 모바일 폭에 맞춤 */
-            box-sizing: border-box;
+            background: white; padding: 25px; border-radius: 15px; 
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1); text-align: center;
+            width: 100%; max-width: 500px; box-sizing: border-box;
         }
-
-        /* 크기 설정 항목 디자인 강화 */
-        .setting-group { margin-bottom: 25px; }
-        .setting-group label { 
-            display: block; 
-            font-size: 1.4rem; 
-            font-weight: bold; 
-            color: #5d4037; 
-            margin-bottom: 15px; 
-        }
-
-        /* 입력창(Input) 크기 키우기 */
-        input[type="number"] {
-            width: 80px;
-            height: 50px;
-            font-size: 1.5rem;
-            border: 2px solid #8d6e63;
-            border-radius: 10px;
-            text-align: center;
-            color: #5d4037;
-            background-color: #fff;
-        }
-
-        #status { 
-            margin: 20px 0; 
-            font-size: 1.4rem; 
-            font-weight: bold; 
-            color: #d32f2f; 
-            min-height: 1.6em;
-        }
-
-        /* 초콜릿 판 컨테이너 */
+        .setting-group label { display: block; font-size: 1.2rem; font-weight: bold; color: #5d4037; margin-bottom: 10px; }
+        input[type="number"] { width: 70px; height: 45px; font-size: 1.3rem; border: 2px solid #8d6e63; border-radius: 8px; text-align: center; }
+        #status { margin: 15px 0; font-size: 1.3rem; font-weight: bold; color: #d32f2f; min-height: 1.5em; }
         #grid-container {
-            display: inline-block;
-            background-color: #3e2723;
-            padding: 12px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            max-width: 100%;
-            overflow-x: auto; /* 화면보다 클 경우 스크롤 */
+            display: inline-block; background-color: #3e2723; padding: 10px; 
+            border-radius: 8px; margin-bottom: 15px; max-width: 100%; overflow-x: auto;
         }
-
-        #grid { 
-            display: grid; 
-            gap: 6px; 
-            margin: 0 auto;
-        }
-
-        /* 초콜릿 조각 크기 확대 (터치 최적화) */
+        #grid { display: grid; gap: 4px; margin: 0 auto; }
         .cell { 
-            width: 55px; 
-            height: 55px; 
-            background-color: #8d6e63; 
-            border-radius: 5px; 
-            cursor: pointer; 
-            transition: opacity 0.3s ease;
-            -webkit-tap-highlight-color: transparent; /* 터치 시 파란 박스 제거 */
+            width: 45px; height: 45px; background-color: #8d6e63; border-radius: 4px; 
+            transition: opacity 0.2s; -webkit-tap-highlight-color: transparent;
         }
-
-        .cell.eaten { 
-            opacity: 0; 
-            pointer-events: none; 
-        }
-
+        .cell.eaten { opacity: 0; pointer-events: none; }
         .cell.poison { background-color: #d32f2f; position: relative; }
-        .cell.poison::after { 
-            content: "☠️"; 
-            position: absolute; 
-            top: 50%; left: 50%; 
-            transform: translate(-50%, -50%); 
-            font-size: 1.5rem; 
-        }
-        
-        /* 버튼 크기 확대 및 모바일 스타일링 */
+        .cell.poison::after { content: "☠️"; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.2rem; }
         button { 
-            width: 100%;
-            padding: 15px; 
-            font-size: 1.2rem; 
-            font-weight: bold;
-            background-color: #5d4037; 
-            color: white; 
-            border: none; 
-            border-radius: 12px; 
-            cursor: pointer; 
-            margin: 10px 0;
-            transition: background 0.2s;
+            width: 100%; padding: 14px; font-size: 1.1rem; font-weight: bold;
+            background-color: #5d4037; color: white; border: none; border-radius: 10px; 
+            cursor: pointer; margin: 6px 0;
         }
-        button:active { background-color: #3e2723; transform: scale(0.98); }
+        button:active { transform: scale(0.98); }
+        .btn-undo { background-color: #f4a460; color: #5d4037; }
+        .btn-secondary { background-color: #8d6e63; }
         .hidden { display: none; }
-
-        @media (max-width: 400px) {
-            .cell { width: 45px; height: 45px; } /* 아주 작은 화면 대응 */
-        }
+        @media (max-width: 450px) { .cell { width: 38px; height: 38px; } }
     </style>
 </head>
 <body>
-
-    <h1>Chomp Mobile</h1>
-
+    <h1>Chomp Pro (7x7 Opt)</h1>
     <div id="menu">
         <div class="setting-group">
-            <label>🍫 초콜릿 판 크기 설정</label>
-            <div style="display: flex; align-items: center; justify-content: center; gap: 15px;">
-                <input type="number" id="rows" value="4" min="2" max="6">
-                <span style="font-size: 1.5rem; font-weight: bold;">X</span>
-                <input type="number" id="cols" value="5" min="2" max="6">
+            <label>🍫 게임판 크기 (최대 7x7)</label>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <input type="number" id="rows" value="7" min="2" max="7">
+                <span style="font-size: 1.2rem;">X</span>
+                <input type="number" id="cols" value="7" min="2" max="7">
             </div>
-            <p style="color: #888; margin-top: 10px;">(추천: 6x6 이하)</p>
         </div>
-        
         <button onclick="setupGame('PVP')">사람 vs 사람</button>
-        <button onclick="setupGame('PVC')">컴퓨터와 대결 </button>
+        <button onclick="setupGame('PVC')">컴퓨터와 대결</button>
     </div>
 
     <div id="game-area" class="hidden">
         <div id="status"></div>
-        <div id="grid-container">
-            <div id="grid"></div>
-        </div>
-        <button onclick="backToMenu()" style="background-color: #8d6e63;">메뉴로 돌아가기</button>
+        <div id="grid-container"><div id="grid"></div></div>
+        <button id="undo-btn" class="btn-undo" onclick="undoMove()">↩ 실행 취소</button>
+        <button onclick="backToMenu()" class="btn-secondary">메뉴로 돌아가기</button>
     </div>
 
     <script>
         let ROWS, COLS, currentPlayer, gameOver, gameMode;
-        let memo = new Map();
-
-        const gridElement = document.getElementById('grid');
-        const statusElement = document.getElementById('status');
-        const menuElement = document.getElementById('menu');
-        const gameArea = document.getElementById('game-area');
+        let memo = new Map(); 
+        let history = [];
 
         function setupGame(mode) {
-            ROWS = parseInt(document.getElementById('rows').value);
-            COLS = parseInt(document.getElementById('cols').value);
-            gameMode = mode;
-            currentPlayer = 1;
-            gameOver = false;
-            memo.clear();
-
-            // 셀 크기 55px + 간격 6px 기준 고정
-            const cellSize = (window.innerWidth < 400) ? 45 : 55;
-            gridElement.style.gridTemplateColumns = `repeat(${COLS}, ${cellSize}px)`;
-            gridElement.style.width = `${COLS * cellSize + (COLS - 1) * 6}px`;
+            ROWS = Math.min(parseInt(document.getElementById('rows').value), 7);
+            COLS = Math.min(parseInt(document.getElementById('cols').value), 7);
+            gameMode = mode; currentPlayer = 1; gameOver = false; history = []; memo.clear();
             
-            menuElement.classList.add('hidden');
-            gameArea.classList.remove('hidden');
-            statusElement.innerText = "당신의 차례입니다!";
+            const cellSize = (window.innerWidth < 450) ? 38 : 45;
+            const grid = document.getElementById('grid');
+            grid.style.gridTemplateColumns = `repeat(${COLS}, ${cellSize}px)`;
+            grid.style.width = `${COLS * cellSize + (COLS-1) * 4}px`;
+            
+            document.getElementById('menu').classList.add('hidden');
+            document.getElementById('game-area').classList.remove('hidden');
+            document.getElementById('status').innerText = "당신의 차례입니다!";
             createBoard();
+            updateUndoButton();
         }
 
         function createBoard() {
-            gridElement.innerHTML = '';
+            const grid = document.getElementById('grid');
+            grid.innerHTML = '';
             for (let r = 0; r < ROWS; r++) {
                 for (let c = 0; c < COLS; c++) {
                     const cell = document.createElement('div');
                     cell.className = 'cell' + (r === ROWS - 1 && c === 0 ? ' poison' : '');
                     cell.dataset.row = r; cell.dataset.col = c;
                     cell.onclick = () => handleChomp(r, c);
-                    gridElement.appendChild(cell);
+                    grid.appendChild(cell);
                 }
             }
         }
 
         function handleChomp(r, c) {
             if (gameOver || (gameMode === 'PVC' && currentPlayer === 2)) return;
-            const target = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
-            if (target.classList.contains('eaten')) return;
-
+            if (document.querySelector(`[data-row="${r}"][data-col="${c}"]`).classList.contains('eaten')) return;
+            saveHistory();
             processMove(r, c);
-
-            if (!gameOver && gameMode === 'PVC' && currentPlayer === 2) {
-                statusElement.innerText = "컴퓨터가 생각 중...";
-                setTimeout(proComputerTurn, 600);
+            if (!gameOver && gameMode === 'PVC') {
+                document.getElementById('status').innerText = "AI 계산 중...";
+                setTimeout(proComputerTurn, 300);
             }
         }
 
         function processMove(row, col) {
             document.querySelectorAll('.cell').forEach(cell => {
-                const r = parseInt(cell.dataset.row);
-                const c = parseInt(cell.dataset.col);
-                if (r <= row && c >= col) cell.classList.add('eaten');
+                if (parseInt(cell.dataset.row) <= row && parseInt(cell.dataset.col) >= col) cell.classList.add('eaten');
             });
-
             if (row === ROWS - 1 && col === 0) {
-                statusElement.innerText = (currentPlayer === 1 ? "당신" : "컴퓨터") + " 패배! 💀";
+                document.getElementById('status').innerText = (currentPlayer === 1 ? "당신" : "컴퓨터") + " 패배! 💀";
                 gameOver = true;
-                return;
+            } else {
+                currentPlayer = currentPlayer === 1 ? 2 : 1;
+                document.getElementById('status').innerText = (currentPlayer === 1 ? "당신" : "컴퓨터") + "의 차례";
             }
-
-            currentPlayer = currentPlayer === 1 ? 2 : 1;
-            statusElement.innerText = (currentPlayer === 1 ? "당신" : "컴퓨터") + "의 차례";
+            updateUndoButton();
         }
 
-        // --- AI 로직 ---
-        function getBoardState() {
-            let heights = new Array(COLS).fill(0);
+        function saveHistory() {
+            history.push({
+                eaten: Array.from(document.querySelectorAll('.cell')).map(c => c.classList.contains('eaten')),
+                currentPlayer: currentPlayer
+            });
+        }
+
+        function undoMove() {
+            if (history.length === 0 || gameOver) return;
+            let last = history.pop();
+            const cells = document.querySelectorAll('.cell');
+            last.eaten.forEach((e, i) => e ? cells[i].classList.add('eaten') : cells[i].classList.remove('eaten'));
+            currentPlayer = last.currentPlayer;
+            document.getElementById('status').innerText = (currentPlayer === 1 ? "당신" : "컴퓨터") + "의 차례";
+            updateUndoButton();
+        }
+
+        function updateUndoButton() { document.getElementById('undo-btn').disabled = history.length === 0 || gameOver; }
+
+        function getHeights() {
+            let h = new Array(COLS).fill(0);
             for (let c = 0; c < COLS; c++) {
                 for (let r = 0; r < ROWS; r++) {
-                    const cell = document.querySelector(`[data-row="${r}"][data-col="${c}"]`);
-                    if (!cell.classList.contains('eaten')) {
-                        heights[c] = ROWS - r;
-                        break;
+                    if (!document.querySelector(`[data-row="${r}"][data-col="${c}"]`).classList.contains('eaten')) {
+                        h[c] = ROWS - r; break;
                     }
                 }
             }
-            return heights.join(',');
+            return h;
         }
 
-        function canWin(stateStr) {
-            if (stateStr === "1" + ",0".repeat(COLS-1)) return false;
-            if (memo.has(stateStr)) return memo.get(stateStr);
-            let heights = stateStr.split(',').map(Number);
+        function solve(heights) {
+            const key = heights.join(',');
+            if (key === "1" + ",0".repeat(COLS-1)) return null;
+            if (memo.has(key)) return memo.get(key);
+
             for (let c = 0; c < COLS; c++) {
                 for (let h = 1; h <= heights[c]; h++) {
                     if (c === 0 && h === 1) continue;
-                    let nextHeights = [...heights];
-                    let r = ROWS - h;
-                    for (let nc = c; nc < COLS; nc++) nextHeights[nc] = Math.min(nextHeights[nc], ROWS - r - 1);
-                    if (!canWin(nextHeights.join(','))) {
-                        memo.set(stateStr, {r: ROWS - h, c: c});
-                        return {r: ROWS - h, c: c};
+                    let next = [...heights];
+                    for (let i = c; i < COLS; i++) next[i] = Math.min(next[i], h - 1);
+                    if (!solve(next)) {
+                        const move = {r: ROWS - h, c: c};
+                        memo.set(key, move); return move;
                     }
                 }
             }
-            memo.set(stateStr, false);
-            return false;
+            memo.set(key, null); return null;
         }
 
         function proComputerTurn() {
-            const currentState = getBoardState();
-            const bestMove = canWin(currentState);
-            if (bestMove) processMove(bestMove.r, bestMove.c);
-            else {
-                const available = [];
-                document.querySelectorAll('.cell:not(.eaten)').forEach(cell => {
-                    const r = parseInt(cell.dataset.row);
-                    const c = parseInt(cell.dataset.col);
-                    if (r !== ROWS - 1 || c !== 0) available.push({r, c});
+            const move = solve(getHeights());
+            if (move) processMove(move.r, move.c);
+            else { // 질 상황이면 랜덤
+                let av = [];
+                document.querySelectorAll('.cell:not(.eaten)').forEach(c => {
+                    if (c.dataset.row != ROWS-1 || c.dataset.col != 0) av.push({r: +c.dataset.row, c: +c.dataset.col});
                 });
-                const choice = available.length > 0 ? available[0] : {r: ROWS-1, c: 0};
-                processMove(choice.r, choice.c);
+                let sel = av.length ? av[Math.floor(Math.random()*av.length)] : {r: ROWS-1, c: 0};
+                processMove(sel.r, sel.c);
             }
         }
-
-        function backToMenu() { menuElement.classList.remove('hidden'); gameArea.classList.add('hidden'); }
+        function backToMenu() { document.getElementById('menu').classList.remove('hidden'); document.getElementById('game-area').classList.add('hidden'); }
     </script>
 </body>
 </html>
