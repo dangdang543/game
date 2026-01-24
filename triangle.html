@@ -11,10 +11,9 @@
             background-color: #f4f7f6; 
             margin: 0; 
             padding: 10px;
-            /* 모바일 클릭 시 파란색 하이라이트 제거 */
             -webkit-tap-highlight-color: transparent;
             user-select: none;
-            touch-action: none; /* 브라우저 기본 제스처 방지 */
+            touch-action: none;
         }
         h1 { font-size: 1.5rem; margin: 10px 0; }
         #game-info { 
@@ -24,46 +23,32 @@
         }
         .score-board { font-size: 1.2rem; font-weight: bold; margin-bottom: 5px; }
         .p1 { color: #e74c3c; } .p2 { color: #3498db; }
-        
-        .canvas-container {
-            width: 100%; max-width: 500px; margin: 0 auto; aspect-ratio: 1 / 1;
-        }
+        .canvas-container { width: 100%; max-width: 500px; margin: 0 auto; aspect-ratio: 1 / 1; }
         canvas { 
             background: white; border: 3px solid #2c3e50; border-radius: 10px; 
-            cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.15);
-            width: 100% !important; height: auto !important;
-            display: block; /* 캔버스 하단 여백 제거 */
+            width: 100% !important; height: auto !important; display: block;
         }
-
-        #msg { height: auto; min-height: 40px; margin-top: 10px; font-size: 1rem; font-weight: bold; color: #2c3e50; padding: 0 10px; }
-        
+        #msg { min-height: 45px; margin-top: 10px; font-size: 1.1rem; font-weight: bold; color: #2c3e50; display: flex; align-items: center; justify-content: center; }
         .controls { 
             margin-top: 15px; display: flex; justify-content: center; 
             gap: 8px; align-items: center; flex-wrap: wrap; 
             max-width: 500px; margin-left: auto; margin-right: auto;
         }
-        .control-group { 
-            background: #fff; padding: 8px 12px; border-radius: 8px; 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05); font-size: 0.9rem;
-        }
+        .control-group { background: #fff; padding: 8px 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         input, select { padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
-        button { 
-            padding: 10px 15px; font-size: 0.9rem; cursor: pointer; 
-            background: #2c3e50; color: white; border: none; border-radius: 6px; flex-grow: 1;
-        }
+        button { padding: 10px 15px; font-size: 0.9rem; cursor: pointer; background: #2c3e50; color: white; border: none; border-radius: 6px; flex-grow: 1; }
         .reset-btn { background: #7f8c8d; }
     </style>
 </head>
 <body>
     <h1>삼각형 만들기</h1>
-    
     <div id="game-info">
         <div class="score-board">
             <span class="p1">P1: <span id="p1-score">0</span></span> &nbsp;|&nbsp; 
             <span class="p2">P2: <span id="p2-score">0</span></span>
         </div>
         <div id="turn-display" style="font-weight: bold; color: #e74c3c;">플레이어 1 차례</div>
-        <div id="msg">목표 삼각형을 선택하고 점을 찍으세요!</div>
+        <div id="msg">목표 삼각형을 만들 점을 찍으세요!</div>
     </div>
 
     <div class="canvas-container">
@@ -105,7 +90,6 @@
                     const x = PADDING + i * SPACING, y = PADDING + j * SPACING;
                     const used = usedPoints.find(p => p.i === i && p.j === j);
                     const sel = selectedPoints.some(p => p.i === i && p.j === j);
-                    
                     ctx.beginPath();
                     ctx.arc(x, y, used ? 12 : (sel ? 10 : 6), 0, Math.PI * 2);
                     ctx.fillStyle = used ? (used.player === 1 ? "#e74c3c" : "#3498db") : (sel ? "#2ecc71" : "#ccc");
@@ -120,22 +104,19 @@
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
-            
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-            
             const mouseX = (clientX - rect.left) * scaleX;
             const mouseY = (clientY - rect.top) * scaleY;
 
             for (let i = 0; i < GRID_SIZE; i++) {
                 for (let j = 0; j < GRID_SIZE; j++) {
                     const x = PADDING + i * SPACING, y = PADDING + j * SPACING;
-                    if (Math.hypot(x - mouseX, y - mouseY) < 28) { // 판정 범위 살짝 확대
+                    if (Math.hypot(x - mouseX, y - mouseY) < 28) {
                         if (usedPoints.some(p => p.i === i && p.j === j)) return;
                         const idx = selectedPoints.findIndex(p => p.i === i && p.j === j);
                         if (idx > -1) selectedPoints.splice(idx, 1);
                         else if (selectedPoints.length < 3) selectedPoints.push({i, j});
-                        
                         if (selectedPoints.length === 3) validateTriangle();
                         requestAnimationFrame(draw);
                         return;
@@ -144,36 +125,44 @@
             }
         }
 
-        // 터치 시작 시 깜빡임 방지를 위해 mousedown 대신 touchstart만 사용하거나 분리
         canvas.addEventListener('touchstart', handleInput, { passive: false });
         canvas.addEventListener('mousedown', handleInput);
 
         function validateTriangle() {
             const [p1, p2, p3] = selectedPoints;
-            const d12 = Math.pow(p1.i - p2.i, 2) + Math.pow(p1.j - p2.j, 2);
-            const d23 = Math.pow(p2.i - p3.i, 2) + Math.pow(p2.j - p3.j, 2);
-            const d31 = Math.pow(p3.i - p1.i, 2) + Math.pow(p3.j - p1.j, 2);
             
-            const sides = [d12, d23, d31].sort((a, b) => a - b);
-            const a2 = sides[0], b2 = sides[1], c2 = sides[2];
-            const crossProduct = Math.abs((p2.i - p1.i) * (p3.j - p1.j) - (p2.j - p1.j) * (p3.i - p1.i));
-
-            if (crossProduct === 0) {
-                document.getElementById('msg').innerText = "일직선입니다! 다시 시도하세요.";
+            // 정수 좌표를 이용한 변의 길이의 제곱 (완전 정수 계산)
+            const d12 = (p1.i - p2.i)**2 + (p1.j - p2.j)**2;
+            const d23 = (p2.i - p3.i)**2 + (p2.j - p3.j)**2;
+            const d31 = (p3.i - p1.i)**2 + (p3.j - p1.j)**2;
+            
+            // 일직선 판별 (외적 이용)
+            const area2 = Math.abs((p2.i - p1.i) * (p3.j - p1.j) - (p2.j - p1.j) * (p3.i - p1.i));
+            if (area2 === 0) {
+                document.getElementById('msg').innerText = "일직선은 삼각형이 아닙니다!";
                 selectedPoints = []; return;
             }
 
-            let type = (a2 + b2 === c2) ? "right" : (a2 + b2 > c2 ? "acute" : "obtuse");
+            // 가장 긴 변 찾기 및 판정
+            const sides = [d12, d23, d31].sort((a, b) => a - b);
+            const sumOther = sides[0] + sides[1];
+            const longest = sides[2];
+
+            let type = "";
+            if (sumOther === longest) type = "right";
+            else if (sumOther > longest) type = "acute";
+            else type = "obtuse";
+
             const names = { acute: "예각", right: "직각", obtuse: "둔각" };
             
             if (type === TARGET_TYPE) {
                 scores[currentPlayer]++;
-                document.getElementById('msg').innerText = `성공! ${names[type]}삼각형.`;
+                document.getElementById('msg').innerText = `성공! ${names[type]}삼각형입니다! (턴 교체)`;
                 selectedPoints.forEach(p => usedPoints.push({i: p.i, j: p.j, player: currentPlayer}));
                 currentPlayer = currentPlayer === 1 ? 2 : 1; 
                 updateUI();
             } else {
-                document.getElementById('msg').innerText = `땡! ${names[type]}삼각형입니다.`;
+                document.getElementById('msg').innerText = `땡! 이건 ${names[type]}삼각형이에요. 다시 하세요!`;
             }
             selectedPoints = [];
         }
