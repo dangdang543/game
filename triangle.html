@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>매트리킹: 삼각형 마스터</title>
+    <style>
+        body { font-family: 'Malgun Gothic', sans-serif; text-align: center; background-color: #f4f7f6; margin-top: 20px; }
+        #game-info { margin-bottom: 20px; padding: 15px; background: white; border-radius: 12px; display: inline-block; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .score-board { font-size: 1.4rem; font-weight: bold; margin-bottom: 10px; }
+        .p1 { color: #e74c3c; } .p2 { color: #3498db; }
+        canvas { background: white; border: 3px solid #2c3e50; border-radius: 10px; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+        #msg { height: 35px; margin-top: 15px; font-size: 1.1rem; font-weight: bold; color: #2c3e50; }
+        .controls { margin-top: 20px; display: flex; justify-content: center; gap: 15px; align-items: center; flex-wrap: wrap; }
+        .control-group { background: #fff; padding: 10px 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 20px; font-size: 1rem; cursor: pointer; background: #2c3e50; color: white; border: none; border-radius: 6px; }
+        .reset-btn { background: #7f8c8d; }
+    </style>
+</head>
+<body>
+    <h1>매트리킹: 정수 판별 시스템</h1>
+    
+    <div id="game-info">
+        <div class="score-board">
+            <span class="p1">P1: <span id="p1-score">0</span></span> &nbsp;|&nbsp; 
+            <span class="p2">P2: <span id="p2-score">0</span></span>
+        </div>
+        <div id="turn-display" style="font-weight: bold; color: #e74c3c;">플레이어 1 차례</div>
+        <div id="msg">목표 삼각형을 선택하고 점을 찍으세요!</div>
+    </div>
+
+    <div>
+        <canvas id="gameCanvas" width="500" height="500"></canvas>
+    </div>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>격자: </label>
+            <input type="number" id="gridInput" value="6" min="3" max="15" style="width: 40px;">
+        </div>
+        <div class="control-group">
+            <label>목표: </label>
+            <select id="targetTriangle">
+                <option value="acute">예각삼각형</option>
+                <option value="right" selected>직각삼각형</option>
+                <option value="obtuse">둔각삼각형</option>
+            </select>
+        </div>
+        <button onclick="changeSettings()">설정 적용</button>
+        <button class="reset-btn" onclick="resetGame()">게임 리셋</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let GRID_SIZE = 6, TARGET_TYPE = 'right', PADDING = 60, SPACING;
+        let selectedPoints = [], usedPoints = [], currentPlayer = 1, scores = { 1: 0, 2: 0 };
+
+        function initDimensions() { SPACING = (canvas.width - PADDING * 2) / (GRID_SIZE - 1); }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < GRID_SIZE; i++) {
+                for (let j = 0; j < GRID_SIZE; j++) {
+                    const x = PADDING + i * SPACING, y = PADDING + j * SPACING;
+                    const used = usedPoints.find(p => p.i === i && p.j === j);
+                    const sel = selectedPoints.some(p => p.i === i && p.j === j);
+                    ctx.beginPath();
+                    ctx.arc(x, y, used ? 12 : (sel ? 9 : 5), 0, Math.PI * 2);
+                    ctx.fillStyle = used ? (used.player === 1 ? "#e74c3c" : "#3498db") : (sel ? "#2ecc71" : "#ccc");
+                    ctx.fill();
+                    ctx.closePath();
+                }
+            }
+        }
+
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
+            for (let i = 0; i < GRID_SIZE; i++) {
+                for (let j = 0; j < GRID_SIZE; j++) {
+                    const x = PADDING + i * SPACING, y = PADDING + j * SPACING;
+                    if (Math.hypot(x - mouseX, y - mouseY) < 20) {
+                        if (usedPoints.some(p => p.i === i && p.j === j)) return;
+                        const idx = selectedPoints.findIndex(p => p.i === i && p.j === j);
+                        if (idx > -1) selectedPoints.splice(idx, 1);
+                        else if (selectedPoints.length < 3) selectedPoints.push({i, j}); // 정수 인덱스만 저장
+                        
+                        if (selectedPoints.length === 3) validateTriangle();
+                        draw(); return;
+                    }
+                }
+            }
+        });
+
+        function validateTriangle() {
+            const [p1, p2, p3] = selectedPoints;
+            
+            // 1. 순수 정수 그리드 좌표 기반 변의 길이 제곱 (오차 0%)
+            const d12 = Math.pow(p1.i - p2.i, 2) + Math.pow(p1.j - p2.j, 2);
+            const d23 = Math.pow(p2.i - p3.i, 2) + Math.pow(p2.j - p3.j, 2);
+            const d31 = Math.pow(p3.i - p1.i, 2) + Math.pow(p3.j - p1.j, 2);
+            
+            const sides = [d12, d23, d31].sort((a, b) => a - b);
+            const a2 = sides[0], b2 = sides[1], c2 = sides[2];
+
+            // 2. 일직선 판별 (정수 외적 이용)
+            const crossProduct = Math.abs((p2.i - p1.i) * (p3.j - p1.j) - (p2.j - p1.j) * (p3.i - p1.i));
+            if (crossProduct === 0) {
+                document.getElementById('msg').innerText = "삼각형이 아닙니다 (일직선)!";
+                selectedPoints = []; return;
+            }
+
+            // 3. 피타고라스 정수 비교
+            let type = "";
+            if (a2 + b2 === c2) type = "right";
+            else if (a2 + b2 > c2) type = "acute";
+            else type = "obtuse";
+
+            const names = { acute: "예각", right: "직각", obtuse: "둔각" };
+            if (type === TARGET_TYPE) {
+                scores[currentPlayer]++;
+                document.getElementById('msg').innerText = `성공! ${names[type]}삼각형입니다.`;
+                selectedPoints.forEach(p => usedPoints.push({i: p.i, j: p.j, player: currentPlayer}));
+            } else {
+                document.getElementById('msg').innerText = `땡! 이것은 ${names[type]}삼각형입니다.`;
+            }
+
+            currentPlayer = currentPlayer === 1 ? 2 : 1;
+            updateUI();
+            selectedPoints = [];
+        }
+
+        function updateUI() {
+            document.getElementById('p1-score').innerText = scores[1];
+            document.getElementById('p2-score').innerText = scores[2];
+            const turnEl = document.getElementById('turn-display');
+            turnEl.innerText = `플레이어 ${currentPlayer} 차례`;
+            turnEl.style.color = currentPlayer === 1 ? '#e74c3c' : '#3498db';
+        }
+
+        function changeSettings() {
+            GRID_SIZE = parseInt(document.getElementById('gridInput').value);
+            TARGET_TYPE = document.getElementById('targetTriangle').value;
+            resetGame();
+        }
+
+        function resetGame() {
+            initDimensions(); selectedPoints = []; usedPoints = []; scores = { 1: 0, 2: 0 }; currentPlayer = 1;
+            const names = { acute: "예각", right: "직각", obtuse: "둔각" };
+            document.getElementById('msg').innerText = `${names[TARGET_TYPE]}삼각형을 만드세요!`;
+            updateUI(); draw();
+        }
+
+        initDimensions(); draw();
+    </script>
+</body>
+</html>
