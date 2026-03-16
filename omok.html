@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>17x17 오목 - 렌주룰 적용</title>
+    <style>
+        body { display: flex; flex-direction: column; align-items: center; background-color: #f4f4f4; font-family: 'Malgun Gothic', sans-serif; }
+        .menu { margin: 20px; padding: 15px; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .status { margin: 10px; font-size: 1.2rem; font-weight: bold; color: #d35400; height: 1.5em; }
+        canvas { background-color: #f3c08b; box-shadow: 0 0 25px rgba(0,0,0,0.2); cursor: crosshair; border: 2px solid #333; }
+        button { padding: 8px 15px; font-size: 15px; cursor: pointer; background: #2c3e50; color: white; border: none; border-radius: 4px; transition: 0.2s; margin: 0 5px; }
+        button:hover { background: #34495e; }
+        .active-mode { background: #e67e22 !important; font-weight: bold; }
+        .rule-note { font-size: 0.85rem; color: #666; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <h1>오목 (Renju Rule)</h1>
+    
+    <div class="menu">
+        <button id="p2pBtn" onclick="setMode('p2p')">사람 vs 사람</button>
+        <button id="p2cBtn" onclick="setMode('p2c')" class="active-mode">사람 vs 컴퓨터</button>
+        <button onclick="resetGame()" style="background: #c0392b;">리셋</button>
+        <div class="rule-note">* 렌주룰: 흑은 33, 44, 장목(6목 이상)이 금지됩니다.</div>
+    </div>
+
+    <div class="status" id="status">흑색(Player 1)의 차례입니다.</div>
+    <canvas id="omokCanvas" width="600" height="600"></canvas>
+
+    <script>
+        const canvas = document.getElementById('omokCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusEl = document.getElementById('status');
+        
+        const size = 17;
+        const padding = 30;
+        const cellSize = (canvas.width - padding * 2) / (size - 1);
+        let board = Array.from(Array(size), () => Array(size).fill(0));
+        let turn = 1; 
+        let gameOver = false;
+        let mode = 'p2c';
+
+        function setMode(newMode) {
+            mode = newMode;
+            document.getElementById('p2pBtn').className = (mode === 'p2p' ? 'active-mode' : '');
+            document.getElementById('p2cBtn').className = (mode === 'p2c' ? 'active-mode' : '');
+            resetGame();
+        }
+
+        function drawBoard() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#333';
+            for (let i = 0; i < size; i++) {
+                ctx.beginPath();
+                ctx.moveTo(padding, padding + i * cellSize);
+                ctx.lineTo(canvas.width - padding, padding + i * cellSize);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(padding + i * cellSize, padding);
+                ctx.lineTo(padding + i * cellSize, canvas.height - padding);
+                ctx.stroke();
+            }
+            // 화점
+            const dots = [4, 8, 12];
+            dots.forEach(y => dots.forEach(x => {
+                ctx.beginPath();
+                ctx.arc(padding + x * cellSize, padding + y * cellSize, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }));
+
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    if (board[y][x] !== 0) drawStone(x, y, board[y][x]);
+                }
+            }
+        }
+
+        function drawStone(x, y, color) {
+            ctx.beginPath();
+            ctx.arc(padding + x * cellSize, padding + y * cellSize, cellSize * 0.42, 0, Math.PI * 2);
+            const grad = ctx.createRadialGradient(padding+x*cellSize-3, padding+y*cellSize-3, 1, padding+x*cellSize, padding+y*cellSize, cellSize*0.4);
+            if (color === 1) { grad.addColorStop(0, '#666'); grad.addColorStop(1, '#000'); }
+            else { grad.addColorStop(0, '#fff'); grad.addColorStop(1, '#bbb'); }
+            ctx.fillStyle = grad;
+            ctx.fill();
+        }
+
+        canvas.onclick = function(e) {
+            if (gameOver || (mode === 'p2c' && turn === 2)) return;
+            const x = Math.round((e.offsetX - padding) / cellSize);
+            const y = Math.round((e.offsetY - padding) / cellSize);
+
+            if (x >= 0 && x < size && y >= 0 && y < size && board[y][x] === 0) {
+                if (turn === 1 && isForbidden(x, y)) {
+                    alert("흑은 렌주룰에 의해 여기에 둘 수 없습니다! (33, 44, 장목 금지)");
+                    return;
+                }
+                placeStone(x, y);
+                if (!gameOver && mode === 'p2c' && turn === 2) setTimeout(aiMove, 500);
+            }
+        };
+
+        function placeStone(x, y) {
+            board[y][x] = turn;
+            drawBoard();
+            const win = checkWin(x, y, turn);
+            if (win) {
+                if (turn === 1 && win > 5) { /* 장목은 승리 처리 안됨 - 하지만 위에서 isForbidden으로 막음 */ }
+                statusEl.innerText = (turn === 1 ? "흑색" : "백색") + " 승리!!!";
+                gameOver = true;
+                return;
+            }
+            turn = (turn === 1 ? 2 : 1);
+            updateStatus();
+        }
+
+        function updateStatus() {
+            if (mode === 'p2p') statusEl.innerText = (turn === 1 ? "흑색(P1)" : "백색(P2)") + "의 차례입니다.";
+            else statusEl.innerText = (turn === 1 ? "흑색(Player)" : "백색(AI)이 생각 중...");
+        }
+
+        function checkWin(x, y, color) {
+            const dirs = [[1,0], [0,1], [1,1], [1,-1]];
+            for (let [dx, dy] of dirs) {
+                let count = 1;
+                for (let i=1; i<size; i++) {
+                    let nx=x+dx*i, ny=y+dy*i;
+                    if (nx>=0 && nx<size && ny>=0 && ny<size && board[ny][nx]===color) count++; else break;
+                }
+                for (let i=1; i<size; i++) {
+                    let nx=x-dx*i, ny=y-dy*i;
+                    if (nx>=0 && nx<size && ny>=0 && ny<size && board[ny][nx]===color) count++; else break;
+                }
+                if (color === 1 && count > 5) return false; // 흑 장목은 승리가 아님
+                if (count >= 5) return count;
+            }
+            return 0;
+        }
+
+        // --- 렌주룰 엔진 ---
+        function isForbidden(x, y) {
+            board[y][x] = 1;
+            const is33 = checkDoubleN(x, y, 3);
+            const is44 = checkDoubleN(x, y, 4);
+            const isOver = checkOverline(x, y);
+            board[y][x] = 0;
+            return is33 || is44 || isOver;
+        }
+
+        function checkOverline(x, y) {
+            const dirs = [[1,0], [0,1], [1,1], [1,-1]];
+            for (let [dx, dy] of dirs) {
+                let count = 1;
+                for (let i=1; i<6; i++) {
+                    let nx=x+dx*i, ny=y+dy*i;
+                    if (nx>=0 && nx<size && ny>=0 && ny<size && board[ny][nx]===1) count++; else break;
+                }
+                for (let i=1; i<6; i++) {
+                    let nx=x-dx*i, ny=y-dy*i;
+                    if (nx>=0 && nx<size && ny>=0 && ny<size && board[ny][nx]===1) count++; else break;
+                }
+                if (count > 5) return true;
+            }
+            return false;
+        }
+
+        function checkDoubleN(x, y, n) {
+            const dirs = [[1,0], [0,1], [1,1], [1,-1]];
+            let countN = 0;
+            for (let [dx, dy] of dirs) {
+                if (isOpenN(x, y, dx, dy, n)) countN++;
+            }
+            return countN >= 2;
+        }
+
+        function isOpenN(x, y, dx, dy, n) {
+            // 단순화된 열린 N 판별 로직
+            let line = [];
+            for(let i=-5; i<=5; i++) {
+                let nx=x+dx*i, ny=y+dy*i;
+                if (nx>=0 && nx<size && ny>=0 && ny<size) line.push(board[ny][nx]);
+                else line.push(2); // 벽
+            }
+            const center = 5;
+            // n=3인 경우 '01110' 형태, n=4인 경우 '011110' 형태 검색
+            let target = "0" + "1".repeat(n) + "0";
+            let testLine = line.join('');
+            return testLine.includes(target);
+        }
+
+        // --- AI 엔진 (더 정교해진 점수표) ---
+        function aiMove() {
+            let bestScore = -Infinity;
+            let bestMoves = [];
+
+            for (let y = 0; y < size; y++) {
+                for (let x = 0; x < size; x++) {
+                    if (board[y][x] === 0) {
+                        // AI(2)는 금수 없음, 플레이어(1)는 금수 자리 점수 배제
+                        if (isForbidden(x, y)) continue; 
+
+                        let attack = getAdvancedScore(x, y, 2);
+                        let defense = getAdvancedScore(x, y, 1);
+                        let total = attack + defense;
+
+                        if (total > bestScore) {
+                            bestScore = total;
+                            bestMoves = [{x, y}];
+                        } else if (total === bestScore) {
+                            bestMoves.push({x, y});
+                        }
+                    }
+                }
+            }
+            const move = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+            placeStone(move.x, move.y);
+        }
+
+        function getAdvancedScore(x, y, color) {
+            let total = 0;
+            const dirs = [[1,0], [0,1], [1,1], [1,-1]];
+            board[y][x] = color;
+            for (let [dx, dy] of dirs) {
+                let cnt = 1;
+                // 연속된 돌 개수 확인
+                for(let i=1; i<5; i++) {
+                    let nx=x+dx*i, ny=y+dy*i;
+                    if(nx>=0 && nx<size && ny>=0 && ny<size && board[ny][nx]===color) cnt++; else break;
+                }
+                for(let i=1; i<5; i++) {
+                    let nx=x-dx*i, ny=y-dy*i;
+                    if(nx>=0 && nx<size && ny>=0 && ny<size && board[ny][nx]===color) cnt++; else break;
+                }
+                
+                if (cnt >= 5) total += 100000;
+                else if (cnt === 4) total += 5000;
+                else if (cnt === 3) total += 500;
+                else if (cnt === 2) total += 50;
+            }
+            board[y][x] = 0;
+            return total;
+        }
+
+        function resetGame() {
+            board = Array.from(Array(size), () => Array(size).fill(0));
+            turn = 1;
+            gameOver = false;
+            updateStatus();
+            drawBoard();
+        }
+
+        drawBoard();
+    </script>
+</body>
+</html>
