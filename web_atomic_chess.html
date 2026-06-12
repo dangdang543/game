@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Atomic Chess - Full Rules & URL Share</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --cell-light: #f0d9b5;
+            --cell-dark: #b58863;
+            --highlight-selected: #7ef16d;
+            --highlight-lastmove: rgba(255, 255, 51, 0.4);
+        }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background-color: var(--bg-color);
+            display: flex; justify-content: center; align-items: center;
+            font-family: sans-serif;
+        }
+
+        #game-container {
+            width: 85vmin; height: 85vmin;
+            display: flex; flex-direction: column;
+            position: relative;
+        }
+
+        #board {
+            display: grid;
+            grid-template-columns: repeat(8, 12.5%);
+            grid-template-rows: repeat(8, 12.5%);
+            width: 100%; height: 100%;
+            border: 2px solid #444;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+
+        .cell {
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; user-select: none; position: relative;
+        }
+
+        .white-cell { background-color: var(--cell-light); }
+        .black-cell { background-color: var(--cell-dark); }
+
+        .piece-img {
+            width: 90%; height: 90%; object-fit: contain;
+            pointer-events: none;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4));
+        }
+
+        .selected { background-color: var(--highlight-selected) !important; }
+        .highlight { background-color: var(--highlight-lastmove) !important; }
+
+        /* 상단 정보 영역 */
+        #ui-layer {
+            position: absolute; top: -45px; width: 100%;
+            display: flex; justify-content: space-between; align-items: center;
+            color: white; font-weight: bold; font-size: 16px;
+        }
+
+        /* 컨트롤 버튼 (하단 4개 구성) */
+        .controls {
+            position: absolute; bottom: -60px; width: 100%;
+            display: flex; justify-content: center; gap: 6px;
+        }
+
+        button {
+            flex: 1; padding: 12px 0; font-size: 13px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s; white-space: nowrap; color: white;
+        }
+
+        button:disabled { opacity: 0.3; cursor: not-allowed; }
+        
+        .btn-primary { background-color: #4f46e5; }
+        .btn-primary:hover:not(:disabled) { background-color: #5e56f3; }
+        
+        .btn-secondary { background-color: #9ca3af; }
+        .btn-secondary:hover:not(:disabled) { background-color: #aeb5c0; }
+        
+        .btn-info { background-color: #0ea5e9; }
+        .btn-info:hover:not(:disabled) { background-color: #38bdf8; }
+        
+        .btn-danger { background-color: #ef4444; }
+        .btn-danger:hover:not(:disabled) { background-color: #f87171; }
+
+        @media (max-width: 600px) {
+            button { font-size: 11px; padding: 10px 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="ui-layer">
+            <div id="turn-indicator">백(White)의 차례입니다</div>
+            <div id="move-count">Moves: 0</div>
+        </div>
+
+        <div id="board"></div>
+
+        <div class="controls">
+            <button class="btn-primary" onclick="copyLink()">🔗 링크복사</button>
+            <button class="btn-secondary" id="undo-btn" onclick="undoMove()">↩ 무르기</button>
+            <button class="btn-info" onclick="toggleFlip()">🔃 판뒤집기</button>
+            <button class="btn-danger" onclick="resetGame()">🔄 초기화</button>
+        </div>
+    </div>
+
+<script>
+const pieceSVGs = {
+    white: { r:'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg', n:'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg', b:'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg', q:'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg', k:'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg', p:'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg' },
+    black: { r:'https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg', n:'https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg', b:'https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg', q:'https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg', k:'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg', p:'https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg' }
+};
+
+let board = [];
+let selectedCell = null;
+let turn = 'white';
+let validMoves = [];
+let isFlipped = false;
+let gameOverStatus = false;
+let lastMoveData = null; // 앙파상 체크를 위한 기록 저장
+
+function initBoardState() {
+    board = Array(8).fill(null).map(() => Array(8).fill(null));
+    const layout = ['r','n','b','q','k','b','n','r'];
+    for(let i=0; i<8; i++) {
+        // 캐슬링 판별을 위해 hasMoved 속성 추가
+        board[0][i] = { type: layout[i], color: 'black', hasMoved: false };
+        board[1][i] = { type: 'p', color: 'black', hasMoved: false };
+        board[6][i] = { type: 'p', color: 'white', hasMoved: false };
+        board[7][i] = { type: layout[i], color: 'white', hasMoved: false };
+    }
+    turn = 'white';
+    gameOverStatus = false;
+    lastMoveData = null;
+}
+
+function loadFromHash() {
+    initBoardState();
+    let hash = window.location.hash.substring(1);
+    
+    if (hash) {
+        let moves = hash.split('-');
+        for (let m of moves) {
+            if (m.length >= 4) {
+                let fr = parseInt(m[0]), fc = parseInt(m[1]), tr = parseInt(m[2]), tc = parseInt(m[3]);
+                let promoStr = m.length === 5 ? m[4] : null;
+                executeMove(fr, fc, tr, tc, promoStr);
+                turn = turn === 'white' ? 'black' : 'white';
+            }
+        }
+    }
+    selectedCell = null;
+    validMoves = [];
+}
+
+// 특정 칸이 적에게 공격받고 있는지 확인 (캐슬링 제한 판별용)
+function isUnderAttack(targetR, targetC, myColor) {
+    const enemyColor = myColor === 'white' ? 'black' : 'white';
+    for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+            let p = board[i][j];
+            if (p && p.color === enemyColor) {
+                if (canAttack(i, j, targetR, targetC, p)) return true;
+            }
+        }
+    }
+    return false;
+}
+
+// 궤적이 비어있는지 확인
+function checkLineOfSight(fr, fc, tr, tc, dr, dc) {
+    let r = fr + dr;
+    let c = fc + dc;
+    while (r !== tr || c !== tc) {
+        if (board[r][c]) return false;
+        r += dr;
+        c += dc;
+    }
+    return true;
+}
+
+function canAttack(fr, fc, tr, tc, piece) {
+    if (piece.type === 'p') {
+        const dir = piece.color === 'white' ? -1 : 1;
+        return (tr === fr + dir) && (Math.abs(tc - fc) === 1);
+    }
+    if (piece.type === 'n') return (Math.abs(fr - tr) === 2 && Math.abs(fc - tc) === 1) || (Math.abs(fr - tr) === 1 && Math.abs(fc - tc) === 2);
+    if (piece.type === 'k') return Math.abs(fr - tr) <= 1 && Math.abs(fc - tc) <= 1;
+    
+    const dr = tr === fr ? 0 : Math.sign(tr - fr);
+    const dc = tc === fc ? 0 : Math.sign(tc - fc);
+    
+    if (piece.type === 'r' || piece.type === 'q') {
+        if (dr === 0 || dc === 0) if (checkLineOfSight(fr, fc, tr, tc, dr, dc)) return true;
+    }
+    if (piece.type === 'b' || piece.type === 'q') {
+        if (Math.abs(dr) === Math.abs(dc)) if (checkLineOfSight(fr, fc, tr, tc, dr, dc)) return true;
+    }
+    return false;
+}
+
+function getValidMoves(r, c) {
+    const piece = board[r][c];
+    if (!piece) return [];
+    let moves = [];
+    const directions = {
+        r: [[0,1],[0,-1],[1,0],[-1,0]],
+        b: [[1,1],[1,-1],[-1,1],[-1,-1]],
+        n: [[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]],
+        k: [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]]
+    };
+    directions.q = [...directions.r, ...directions.b];
+
+    if (piece.type === 'p') {
+        const dir = piece.color === 'white' ? -1 : 1;
+        // 직진 이동
+        if (!board[r+dir]?.[c]) {
+            moves.push([r+dir, c]);
+            if (!piece.hasMoved && !board[r+2*dir]?.[c]) moves.push([r+2*dir, c]);
+        }
+        // 대각선 공격 및 앙파상(En Passant)
+        [[dir, 1], [dir, -1]].forEach(([dr, dc]) => {
+            const tr = r + dr, tc = c + dc;
+            // 일반 대각 공격
+            if (board[tr]?.[tc] && board[tr][tc].color !== piece.color) moves.push([tr, tc]);
+            
+            // 앙파상 조건 확인
+            if (!board[tr]?.[tc] && lastMoveData && lastMoveData.piece === 'p') {
+                if (lastMoveData.tc === tc && lastMoveData.tr === r && Math.abs(lastMoveData.fr - lastMoveData.tr) === 2) {
+                    moves.push([tr, tc]);
+                }
+            }
+        });
+    } else if (['r', 'b', 'q'].includes(piece.type)) {
+        directions[piece.type].forEach(([dr, dc]) => {
+            for (let i=1; i<8; i++) {
+                const tr = r + dr*i, tc = c + dc*i;
+                if (tr<0||tr>7||tc<0||tc>7) break;
+                if (!board[tr][tc]) moves.push([tr, tc]);
+                else {
+                    if (board[tr][tc].color !== piece.color) moves.push([tr, tc]);
+                    break;
+                }
+            }
+        });
+    } else { // Knight, King
+        directions[piece.type].forEach(([dr, dc]) => {
+            const tr = r + dr, tc = c + dc;
+            if (tr>=0&&tr<8&&tc>=0&&tc<8 && (!board[tr][tc] || board[tr][tc].color !== piece.color))
+                moves.push([tr, tc]);
+        });
+
+        // 킹 캐슬링(Castling)
+        if (piece.type === 'k' && !piece.hasMoved) {
+            // 킹사이드 캐슬링 (오른쪽 룩)
+            if (board[r][7] && board[r][7].type === 'r' && !board[r][7].hasMoved) {
+                if (!board[r][5] && !board[r][6]) {
+                    if (!isUnderAttack(r, 4, turn) && !isUnderAttack(r, 5, turn) && !isUnderAttack(r, 6, turn)) {
+                        moves.push([r, 6]);
+                    }
+                }
+            }
+            // 퀸사이드 캐슬링 (왼쪽 룩)
+            if (board[r][0] && board[r][0].type === 'r' && !board[r][0].hasMoved) {
+                if (!board[r][1] && !board[r][2] && !board[r][3]) {
+                    if (!isUnderAttack(r, 4, turn) && !isUnderAttack(r, 3, turn) && !isUnderAttack(r, 2, turn)) {
+                        moves.push([r, 2]);
+                    }
+                }
+            }
+        }
+    }
+    return moves;
+}
+
+function handleCellClick(r, c) {
+    if (gameOverStatus) return;
+
+    const isMove = validMoves.some(m => m[0] === r && m[1] === c);
+    
+    if (isMove && selectedCell) {
+        let moveStr = `${selectedCell.r}${selectedCell.c}${r}${c}`;
+        const piece = board[selectedCell.r][selectedCell.c];
+
+        // 폰 프로모션(승급) 트리거
+        if (piece.type === 'p' && (r === 0 || r === 7)) {
+            let promo = prompt("승급할 기물을 입력하세요\n(q: 퀸, r: 룩, b: 비숍, n: 나이트)\n*기본값: q", "q");
+            if (!promo) {
+                selectedCell = null; validMoves = []; render(); return; // 승급 취소
+            }
+            promo = promo.toLowerCase();
+            if (!['q','r','b','n'].includes(promo)) promo = 'q';
+            moveStr += promo;
+        }
+
+        let hash = window.location.hash.substring(1);
+        let moves = hash ? hash.split('-') : [];
+        moves.push(moveStr);
+        
+        selectedCell = null;
+        validMoves = [];
+        window.location.hash = moves.join('-'); // hashchange 이벤트 유발
+    } else if (board[r][c] && board[r][c].color === turn) {
+        selectedCell = {r, c};
+        validMoves = getValidMoves(r, c);
+        render();
+    } else {
+        selectedCell = null;
+        validMoves = [];
+        render();
+    }
+}
+
+function executeMove(fr, fc, tr, tc, promoStr = null) {
+    const piece = board[fr][fc];
+    const target = board[tr][tc];
+
+    let isEnPassant = piece.type === 'p' && fc !== tc && !target;
+    let isCastling = piece.type === 'k' && Math.abs(fc - tc) === 2;
+
+    // 프로모션 적용
+    if (promoStr) piece.type = promoStr;
+    piece.hasMoved = true;
+
+    if (isEnPassant) {
+        board[fr][tc] = null; // 앙파상 당한 적 폰 제거
+        board[fr][fc] = null; // 잡은 폰 폭발 (아토믹 룰)
+        explode(tr, tc);      // 이동 목적지 주변 폭발
+    } else if (isCastling) {
+        board[tr][tc] = piece;
+        board[fr][fc] = null;
+        if (tc > fc) { // 킹사이드
+            board[tr][tc - 1] = board[tr][7];
+            board[tr][tc - 1].hasMoved = true;
+            board[tr][7] = null;
+        } else { // 퀸사이드
+            board[tr][tc + 1] = board[tr][0];
+            board[tr][tc + 1].hasMoved = true;
+            board[tr][0] = null;
+        }
+    } else if (target) { // 일반적인 잡기 및 폭발
+        board[fr][fc] = null;
+        explode(tr, tc);
+    } else { // 단순 이동
+        board[tr][tc] = piece;
+        board[fr][fc] = null;
+    }
+
+    lastMoveData = { fr, fc, tr, tc, piece: piece.type };
+}
+
+function explode(r, c) {
+    for (let i = r-1; i <= r+1; i++) {
+        for (let j = c-1; j <= c+1; j++) {
+            if (i>=0 && i<8 && j>=0 && j<8) {
+                const p = board[i][j];
+                // 폰은 중심폭발이 아닌 이상 터지지 않음
+                if (p && (p.type !== 'p' || (i === r && j === c))) board[i][j] = null;
+            }
+        }
+    }
+}
+
+function copyLink() {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+        alert("🔗 체스 링크가 복사되었습니다!\n상대방에게 주소를 보내면 현재 배치 상태 그대로 대국을 이어나갈 수 있습니다.");
+    });
+}
+
+function undoMove() {
+    let hash = window.location.hash.substring(1);
+    if (hash) {
+        let moves = hash.split('-');
+        moves.pop();
+        window.location.hash = moves.join('-');
+    }
+}
+
+function toggleFlip() {
+    isFlipped = !isFlipped;
+    render();
+}
+
+function resetGame() {
+    if(confirm("게임을 초기화하시겠습니까?")) window.location.hash = '';
+}
+
+function checkGameOver() {
+    let wk = false, bk = false;
+    board.flat().forEach(p => { if(p?.type==='k'){ if(p.color==='white') wk=true; else bk=true; }});
+    
+    const indicator = document.getElementById('turn-indicator');
+    if (!wk || !bk) {
+        gameOverStatus = true;
+        if (!wk && !bk) {
+            indicator.textContent = "💥 무승부 (양쪽 킹 동시 폭발)";
+            indicator.style.color = '#0ea5e9';
+        } else if (!wk) {
+            indicator.textContent = "🏆 흑(Black)의 승리!";
+            indicator.style.color = '#ff4d4d';
+        } else {
+            indicator.textContent = "🏆 백(White)의 승리!";
+            indicator.style.color = '#4f46e5';
+        }
+        return true;
+    }
+    return false;
+}
+
+function render() {
+    const boardEl = document.getElementById('board');
+    boardEl.innerHTML = '';
+    
+    const indicator = document.getElementById('turn-indicator');
+    const moveCountEl = document.getElementById('move-count');
+    
+    let hash = window.location.hash.substring(1);
+    let moves = hash ? hash.split('-') : [];
+    moveCountEl.textContent = `Moves: ${moves.length}`;
+    document.getElementById('undo-btn').disabled = moves.length === 0;
+
+    const isOver = checkGameOver();
+    if (!isOver) {
+        indicator.textContent = turn === 'white' ? "백(White)의 차례입니다" : "흑(Black)의 차례입니다";
+        indicator.style.color = turn === 'white' ? '#fff' : '#ff4d4d';
+    }
+
+    let lastMove = null;
+    if (moves.length > 0) {
+        let lastMoveStr = moves[moves.length - 1];
+        if (lastMoveStr.length >= 4) {
+            lastMove = {
+                fr: parseInt(lastMoveStr[0]), fc: parseInt(lastMoveStr[1]),
+                tr: parseInt(lastMoveStr[2]), tc: parseInt(lastMoveStr[3])
+            };
+        }
+    }
+
+    let rowStart = isFlipped ? 7 : 0;
+    let rowEnd = isFlipped ? -1 : 8;
+    let rowStep = isFlipped ? -1 : 1;
+    let colStart = isFlipped ? 7 : 0;
+    let colEnd = isFlipped ? -1 : 8;
+    let colStep = isFlipped ? -1 : 1;
+
+    for (let r = rowStart; r !== rowEnd; r += rowStep) {
+        for (let c = colStart; c !== colEnd; c += colStep) {
+            const cell = document.createElement('div');
+            cell.className = `cell ${(r+c)%2===0 ? 'white-cell' : 'black-cell'}`;
+            
+            if (selectedCell?.r === r && selectedCell?.c === c) cell.classList.add('selected');
+            
+            if (lastMove && ((lastMove.fr === r && lastMove.fc === c) || (lastMove.tr === r && lastMove.tc === c))) {
+                cell.classList.add('highlight');
+            }
+            
+            if (board[r][c]) {
+                const img = document.createElement('img');
+                img.src = pieceSVGs[board[r][c].color][board[r][c].type];
+                img.className = 'piece-img';
+                cell.appendChild(img);
+            }
+            
+            // NOTE: 초록색 힌트 점을 렌더링하던 코드가 제거되었습니다.
+            
+            cell.onclick = () => handleCellClick(r, c);
+            boardEl.appendChild(cell);
+        }
+    }
+}
+
+window.addEventListener('hashchange', () => {
+    loadFromHash();
+    render();
+});
+
+loadFromHash();
+render();
+</script>
+</body>
+</html>
