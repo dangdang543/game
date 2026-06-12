@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>URL 공유 오목</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f0f2f5; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 10px; }
+        
+        .container { background: white; padding: 12px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; width: 100%; max-width: 600px; }
+        
+        #board-container { position: relative; width: 100%; aspect-ratio: 1 / 1; background-color: #e6b873; border: 2px solid #b38644; box-shadow: inset 0 0 10px rgba(0,0,0,0.15); cursor: pointer; border-radius: 4px; margin: 0 auto; -webkit-user-select: none; user-select: none; }
+        svg { width: 100%; height: 100%; display: block; }
+        
+        /* 버튼을 1줄(가로)로 꽉 차게 정렬 */
+        .controls { margin-top: 10px; display: flex; gap: 4px; width: 100%; }
+        button { flex: 1; padding: 12px 0; font-size: 13px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; letter-spacing: -0.5px; transition: all 0.2s; -webkit-tap-highlight-color: transparent; white-space: nowrap; }
+        
+        .btn-primary { background-color: #4f46e5; color: white; }
+        .btn-secondary { background-color: #9ca3af; color: white; }
+        .btn-info { background-color: #0ea5e9; color: white; } /* 수순보기 버튼 색상 */
+        .btn-danger { background-color: #ef4444; color: white; } 
+        
+        .status-box { margin-top: 10px; padding: 10px; background: #f9fafb; border-radius: 6px; font-size: 14px; font-weight: 500; }
+        .turn-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+        .turn-B { background: black; }
+        .turn-W { background: white; border: 1px solid #ccc; }
+
+        @media (max-width: 600px) {
+            body { padding: 0; background-color: white; }
+            .container { padding: 5px; border-radius: 0; box-shadow: none; }
+            #board-container { border-left: none; border-right: none; border-radius: 0; }
+            .status-box, .controls { margin-left: 5px; margin-right: 5px; }
+            button { font-size: 12px; padding: 10px 0; } /* 모바일에서 텍스트 깨짐 방지 */
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="board-container">
+        <svg id="omok-board" viewBox="0 0 320 320"></svg>
+    </div>
+
+    <div class="status-box">
+        <span id="turn-color" class="turn-indicator turn-B"></span>
+        <span id="status-text">흑의 차례 (총 0수)</span>
+    </div>
+
+    <div class="controls">
+        <button class="btn-primary" onclick="copyLink()">🔗 링크복사</button>
+        <button class="btn-secondary" onclick="undoMove()">↩ 무르기</button>
+        <button class="btn-info" id="btn-numbers" onclick="toggleNumbers()">🔢 수순보기</button>
+        <button class="btn-danger" onclick="resetBoard()">🔄 초기화</button>
+    </div>
+</div>
+
+<script>
+    const size = 15;
+    const chars = 'abcdefghijklmno';
+    const svg = document.getElementById('omok-board');
+    const pad = 16, step = 20;
+    
+    // 수순 보기 상태 저장 변수
+    let showNumbers = false;
+
+    function initBoardLayout() {
+        let html = '';
+        for(let i=0; i<size; i++) {
+            let pos = pad + i * step;
+            html += `<line x1="${pad}" y1="${pos}" x2="${pad + (size-1)*step}" y2="${pos}" stroke="#444" stroke-width="0.8"/>`;
+            html += `<line x1="${pos}" y1="${pad}" x2="${pos}" y2="${pad + (size-1)*step}" stroke="#444" stroke-width="0.8"/>`;
+        }
+        const center = 7;
+        const side = 3;
+        const stars = [side, center, size - 1 - side];
+        stars.forEach(cx => {
+            stars.forEach(cy => {
+                if((cx === center || cy === center) || (cx !== center && cy !== center)) {
+                    html += `<circle cx="${pad + cx * step}" cy="${pad + cy * step}" r="2.2" fill="#222"/>`;
+                }
+            });
+        });
+        html += `<g id="stones"></g>`;
+        svg.innerHTML = html;
+    }
+
+    // 수순보기 버튼 토글 함수
+    function toggleNumbers() {
+        showNumbers = !showNumbers;
+        const btn = document.getElementById('btn-numbers');
+        if(showNumbers) {
+            btn.innerHTML = '숫자숨김';
+            btn.style.backgroundColor = '#0284c7'; // 활성화 시 살짝 어두운 파란색
+        } else {
+            btn.innerHTML = '🔢 수순보기';
+            btn.style.backgroundColor = '#0ea5e9'; // 원래 색
+        }
+        render(); // 바둑판 다시 그리기
+    }
+
+    function computeBoardState(hashString) {
+        let board = Array(size).fill(null).map(() => Array(size).fill(null));
+        let moveCount = 0;
+        let lastX = -1, lastY = -1;
+
+        for (let i = 0; i < hashString.length; i += 2) {
+            let x = chars.indexOf(hashString[i]);
+            let y = chars.indexOf(hashString[i+1]);
+            if (x >= 0 && x < size && y >= 0 && y < size) {
+                if (board[y][x] !== null) continue; 
+                moveCount++;
+                let color = (moveCount % 2 !== 0) ? 'B' : 'W';
+                // 돌의 색상뿐만 아니라 몇 번째 수(no)인지도 함께 저장합니다.
+                board[y][x] = { color: color, no: moveCount }; 
+                lastX = x;
+                lastY = y;
+            }
+        }
+        return { board, moveCount, lastX, lastY };
+    }
+
+    function render() {
+        let hash = window.location.hash.substring(1);
+        let { board, moveCount, lastX, lastY } = computeBoardState(hash);
+        let stonesGroup = document.getElementById('stones');
+        let html = '';
+        
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                if (board[y][x] !== null) {
+                    let cell = board[y][x];
+                    let cx = pad + x * step, cy = pad + y * step;
+                    let isLast = (x === lastX && y === lastY);
+                    
+                    if (cell.color === 'B') {
+                        html += `<circle cx="${cx}" cy="${cy}" r="9" fill="#111" stroke="#000" stroke-width="0.5"/>`;
+                        if (showNumbers) {
+                            // 수순 번호 그리기 (흑돌 위엔 흰색 글씨)
+                            html += `<text x="${cx}" y="${cy}" fill="#fff" font-size="8.5" font-family="Arial" font-weight="bold" text-anchor="middle" dominant-baseline="central" dy="0.5">${cell.no}</text>`;
+                        } else if (isLast) {
+                            html += `<circle cx="${cx}" cy="${cy}" r="2.5" fill="#ef4444"/>`;
+                        }
+                    } else {
+                        html += `<circle cx="${cx}" cy="${cy}" r="9" fill="#fff" stroke="#888" stroke-width="0.8"/>`;
+                        if (showNumbers) {
+                            // 수순 번호 그리기 (백돌 위엔 검은색 글씨)
+                            html += `<text x="${cx}" y="${cy}" fill="#000" font-size="8.5" font-family="Arial" font-weight="bold" text-anchor="middle" dominant-baseline="central" dy="0.5">${cell.no}</text>`;
+                        } else if (isLast) {
+                            html += `<circle cx="${cx}" cy="${cy}" r="2.5" fill="#ef4444"/>`;
+                        }
+                    }
+                }
+            }
+        }
+        stonesGroup.innerHTML = html;
+        let nextColor = (moveCount % 2 === 0) ? 'B' : 'W';
+        document.getElementById('turn-color').className = `turn-indicator turn-${nextColor}`;
+        document.getElementById('status-text').innerText = `${nextColor === 'B' ? '흑' : '백'}의 차례 (총 ${moveCount}수)`;
+    }
+
+    document.getElementById('board-container').addEventListener('click', function(e) {
+        let rect = this.getBoundingClientRect();
+        let mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
+        
+        let gridX = Math.round(((mouseX / rect.width) * 320 - pad) / step);
+        let gridY = Math.round(((mouseY / rect.height) * 320 - pad) / step);
+
+        if (gridX >= 0 && gridX < size && gridY >= 0 && gridY < size) {
+            let currentHash = window.location.hash.substring(1);
+            let { board } = computeBoardState(currentHash);
+            
+            if (board[gridY][gridX] === null) {
+                let nextMove = chars[gridX] + chars[gridY];
+                window.location.hash = currentHash + nextMove;
+            }
+        }
+    });
+
+    function copyLink() {
+        navigator.clipboard.writeText(window.location.href).then(() => alert("🔗 오목 링크가 복사되었습니다!"));
+    }
+    function undoMove() {
+        let currentHash = window.location.hash.substring(1);
+        if (currentHash.length >= 2) window.location.hash = currentHash.slice(0, -2);
+    }
+    function resetBoard() {
+        if (confirm("판을 비우고 새로 시작하시겠습니까?")) window.location.hash = '';
+    }
+
+    window.addEventListener('hashchange', render);
+    initBoardLayout();
+    render();
+</script>
+
+</body>
+</html>
