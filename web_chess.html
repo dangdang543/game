@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>URL 공유 체스</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f0f2f5; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 10px; }
+        
+        .container { background: white; padding: 12px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; width: 100%; max-width: 500px; }
+        
+        #board-container { width: 100%; aspect-ratio: 1 / 1; border: 2px solid #555; border-radius: 4px; overflow: hidden; margin: 0 auto; -webkit-user-select: none; user-select: none; }
+        #chessboard { display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); width: 100%; height: 100%; }
+        
+        .square { display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; }
+        
+        /* 체스판 색상 (조금 더 모던하고 편안한 톤으로 미세 조정) */
+        .light { background-color: #eeeed2; }
+        .dark { background-color: #769656; }
+        
+        /* 선택 및 하이라이트 효과 */
+        .highlight { background-color: rgba(255, 255, 51, 0.5) !important; }
+        .selected::after { content: ''; position: absolute; width: 100%; height: 100%; border: 4px solid rgba(0, 0, 0, 0.3); box-sizing: border-box; }
+
+        /* 기물(SVG 이미지) 스타일: 큼직하고 깔끔하게 */
+        .chess-piece { 
+            width: 90%; 
+            height: 90%; 
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4)); 
+            pointer-events: none; /* 클릭 시 이미지 드래그 방지 */
+        }
+
+        .controls { margin-top: 10px; display: flex; gap: 4px; width: 100%; }
+        button { flex: 1; padding: 12px 0; font-size: 13px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; letter-spacing: -0.5px; transition: all 0.2s; -webkit-tap-highlight-color: transparent; white-space: nowrap; }
+        
+        .btn-primary { background-color: #4f46e5; color: white; }
+        .btn-secondary { background-color: #9ca3af; color: white; }
+        .btn-info { background-color: #0ea5e9; color: white; }
+        .btn-danger { background-color: #ef4444; color: white; } 
+        
+        .status-box { margin-top: 10px; padding: 10px; background: #f9fafb; border-radius: 6px; font-size: 15px; font-weight: bold; color: #333; }
+
+        @media (max-width: 600px) {
+            body { padding: 0; background-color: white; }
+            .container { padding: 0; border-radius: 0; box-shadow: none; max-width: 100%; }
+            #board-container { border-left: none; border-right: none; border-radius: 0; }
+            .status-box, .controls { margin-left: 8px; margin-right: 8px; }
+            button { font-size: 12px; padding: 10px 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="board-container">
+        <div id="chessboard"></div>
+    </div>
+
+    <div class="status-box" id="status-text">백의 차례입니다</div>
+
+    <div class="controls">
+        <button class="btn-primary" onclick="copyLink()">🔗 링크복사</button>
+        <button class="btn-secondary" onclick="undoMove()">↩ 무르기</button>
+        <button class="btn-info" onclick="toggleFlip()">🔃 판뒤집기</button>
+        <button class="btn-danger" onclick="resetBoard()">🔄 초기화</button>
+    </div>
+</div>
+
+<script>
+    const game = new Chess();
+    const boardEl = document.getElementById('chessboard');
+    const cols = ['a','b','c','d','e','f','g','h'];
+    
+    // 단순하고 깔끔한 고화질 SVG 이미지 링크 (위키미디어 공용 표준 에셋)
+    const pieceImages = {
+        'w': {
+            'k': 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg',
+            'q': 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg',
+            'r': 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg',
+            'b': 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg',
+            'n': 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg',
+            'p': 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg'
+        },
+        'b': {
+            'k': 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg',
+            'q': 'https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg',
+            'r': 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg',
+            'b': 'https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg',
+            'n': 'https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg',
+            'p': 'https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg'
+        }
+    };
+    
+    let selectedSquare = null;
+    let isFlipped = false;
+
+    function toggleFlip() {
+        isFlipped = !isFlipped;
+        render();
+    }
+
+    function loadFromHash() {
+        game.reset();
+        let hash = window.location.hash.substring(1);
+        if (hash) {
+            let moves = hash.split('-');
+            for (let m of moves) {
+                if (m.length >= 4) {
+                    let from = m.substring(0, 2);
+                    let to = m.substring(2, 4);
+                    let promo = m.length === 5 ? m[4] : undefined;
+                    game.move({ from: from, to: to, promotion: promo });
+                }
+            }
+        }
+        selectedSquare = null;
+    }
+
+    function render() {
+        boardEl.innerHTML = '';
+        let boardState = game.board(); 
+        
+        let lastMove = null;
+        let history = game.history({ verbose: true });
+        if (history.length > 0) {
+            lastMove = history[history.length - 1];
+        }
+
+        let rowStart = isFlipped ? 7 : 0;
+        let rowEnd = isFlipped ? -1 : 8;
+        let rowStep = isFlipped ? -1 : 1;
+
+        let colStart = isFlipped ? 7 : 0;
+        let colEnd = isFlipped ? -1 : 8;
+        let colStep = isFlipped ? -1 : 1;
+
+        for (let r = rowStart; r !== rowEnd; r += rowStep) {
+            for (let c = colStart; c !== colEnd; c += colStep) {
+                let square = cols[c] + (8 - r); 
+                
+                let cell = document.createElement('div');
+                let isLight = (r + c) % 2 === 0;
+                cell.className = `square ${isLight ? 'light' : 'dark'}`;
+                
+                if (selectedSquare === square) cell.classList.add('selected');
+                if (lastMove && (lastMove.from === square || lastMove.to === square)) cell.classList.add('highlight');
+
+                // 고화질 SVG 이미지 기물 삽입
+                let piece = boardState[r][c];
+                if (piece) {
+                    let img = document.createElement('img');
+                    img.src = pieceImages[piece.color][piece.type];
+                    img.className = 'chess-piece';
+                    cell.appendChild(img);
+                }
+
+                cell.onclick = () => handleSquareClick(square);
+                boardEl.appendChild(cell);
+            }
+        }
+        updateStatus();
+    }
+
+    function handleSquareClick(sq) {
+        if (game.game_over()) return;
+
+        if (selectedSquare === null) {
+            let p = game.get(sq);
+            if (p && p.color === game.turn()) {
+                selectedSquare = sq;
+                render();
+            }
+        } else {
+            if (selectedSquare === sq) {
+                selectedSquare = null;
+                render();
+                return;
+            }
+
+            let moveObj = { from: selectedSquare, to: sq };
+            
+            let p = game.get(selectedSquare);
+            if (p && p.type === 'p' && ((p.color === 'w' && sq[1] === '8') || (p.color === 'b' && sq[1] === '1'))) {
+                let moves = game.moves({ verbose: true });
+                let isPromoValid = moves.some(m => m.from === moveObj.from && m.to === moveObj.to);
+                
+                if (isPromoValid) {
+                    let promo = prompt("승급할 기물을 입력하세요\n(Q: 퀸, R: 룩, B: 비숍, N: 나이트)\n*기본값: Q", "Q");
+                    if (!promo) { selectedSquare = null; render(); return; }
+                    promo = promo.toLowerCase();
+                    if (!['q','r','b','n'].includes(promo)) promo = 'q';
+                    moveObj.promotion = promo;
+                }
+            }
+
+            let move = game.move(moveObj);
+            
+            if (move) {
+                selectedSquare = null;
+                updateHash();
+            } else {
+                let newP = game.get(sq);
+                if (newP && newP.color === game.turn()) {
+                    selectedSquare = sq; 
+                    render();
+                } else {
+                    selectedSquare = null; 
+                    render();
+                }
+            }
+        }
+    }
+
+    function updateStatus() {
+        let statusEl = document.getElementById('status-text');
+        let turnName = game.turn() === 'w' ? '백(White)' : '흑(Black)';
+
+        if (game.in_checkmate()) {
+            statusEl.innerText = `🏆 게임 종료! ${turnName === '백(White)' ? '흑' : '백'}의 승리 (체크메이트)`;
+            statusEl.style.color = '#ef4444';
+        } else if (game.in_draw() || game.in_stalemate() || game.in_threefold_repetition()) {
+            statusEl.innerText = "🤝 무승부 (Draw)";
+            statusEl.style.color = '#0ea5e9';
+        } else {
+            statusEl.innerText = `${turnName}의 차례입니다`;
+            if (game.in_check()) statusEl.innerText += " (🔥 체크!)";
+            statusEl.style.color = '#333';
+        }
+    }
+
+    function updateHash() {
+        let history = game.history({ verbose: true });
+        let hashMoves = history.map(m => m.from + m.to + (m.promotion || ''));
+        window.location.hash = hashMoves.join('-');
+    }
+
+    function copyLink() {
+        navigator.clipboard.writeText(window.location.href).then(() => alert("🔗 체스 링크가 복사되었습니다!\n상대방에게 보내면 현재 상태 그대로 대국을 이어나갈 수 있습니다."));
+    }
+
+    function undoMove() {
+        let hash = window.location.hash.substring(1);
+        if (hash) {
+            let moves = hash.split('-');
+            moves.pop(); 
+            window.location.hash = moves.join('-');
+        }
+    }
+
+    function resetBoard() {
+        if (confirm("게임을 초기화하시겠습니까?")) window.location.hash = '';
+    }
+
+    window.addEventListener('hashchange', () => {
+        loadFromHash();
+        render();
+    });
+
+    loadFromHash();
+    render();
+</script>
+
+</body>
+</html>
