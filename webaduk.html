@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>웹 바둑판</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f0f2f5; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; width: 100%; max-width: 540px; }
+        
+        #board-container { position: relative; width: 100%; aspect-ratio: 1 / 1; background-color: #e6b873; border: 2px solid #b38644; box-shadow: inset 0 0 10px rgba(0,0,0,0.15); cursor: pointer; border-radius: 4px; margin: 0 auto; -webkit-user-select: none; user-select: none; }
+        svg { width: 100%; height: 100%; display: block; }
+        
+        .status-box { margin-top: 15px; padding: 10px; background: #f9fafb; border-radius: 6px; font-size: 14px; font-weight: bold; color: #333; }
+        .turn-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+        .turn-B { background: black; }
+        .turn-W { background: white; border: 1px solid #ccc; }
+
+        /* 버튼 영역 레이아웃 설정 */
+        .controls-container { margin-top: 15px; display: flex; flex-direction: column; gap: 10px; }
+        .row-1 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .row-2 { display: flex; gap: 8px; align-items: stretch; justify-content: space-between; }
+        
+        button { padding: 10px 5px; font-size: 13px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s; -webkit-tap-highlight-color: transparent; }
+        button:active { transform: scale(0.96); }
+        
+        .btn-primary { background-color: #4f46e5; color: white; }
+        .btn-download { background-color: #059669; color: white; }
+        .btn-upload { background-color: #d97706; color: white; } 
+        .btn-info { background-color: #0284c7; color: white; }
+        
+        .btn-nav { background-color: #4b5563; color: white; flex: 1; font-size: 16px; }
+        .btn-review { background-color: #9333ea; color: white; flex: 1.5; }
+        .btn-review.active { background-color: #dc2626; animation: pulse 1.5s infinite; }
+
+        #move-input { width: 60px; text-align: center; font-size: 15px; font-weight: bold; border: 2px solid #ccc; border-radius: 6px; outline: none; }
+        #move-input:focus { border-color: #4f46e5; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 0; background-color: white; }
+            .container { padding: 10px; border-radius: 0; box-shadow: none; }
+            #board-container { border-left: none; border-right: none; border-radius: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="board-container">
+        <svg id="baduk-board" viewBox="0 0 400 400"></svg>
+    </div>
+
+    <div class="status-box">
+        <span id="turn-color" class="turn-indicator turn-B"></span>
+        <span id="status-text">대기 중</span>
+    </div>
+
+    <input type="file" id="sgf-file-input" accept=".sgf" style="display: none;" onchange="loadSGFFile(event)">
+
+    <div class="controls-container">
+        <div class="row-1">
+            <button class="btn-primary" onclick="copyLink()">🔗 링크복사</button>
+            <button class="btn-download" onclick="downloadSGF()">💾 SGF저장</button>
+            <button class="btn-upload" onclick="document.getElementById('sgf-file-input').click()">📂 SGF열기</button>
+            <button class="btn-info" onclick="toggleMoveNumbers()">🔢 수순보기</button>
+        </div>
+        <div class="row-2">
+            <button class="btn-nav" onclick="goPrevMove()" title="왼쪽 방향키">◀</button>
+            <input type="number" id="move-input" min="0" value="0" onkeydown="handleInputEnter(event)" onblur="jumpToMove()">
+            <button class="btn-nav" onclick="goNextMove()" title="오른쪽 방향키">▶</button>
+            <button id="btn-review" class="btn-review" onclick="toggleReviewMode()">🔍 검토</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const size = 19;
+    const chars = 'abcdefghijklmnopqrs';
+    const svg = document.getElementById('baduk-board');
+    const pad = 20, step = 20;
+
+    // 상태 관리 변수
+    let currentMoveIndex = 0;       // 현재 화면에 보여지는 수순
+    let showMoveNumbers = false;    // 수순 표시 여부
+    let isReviewMode = false;       // 검토 모드 여부
+    let savedReviewState = null;    // 검토 모드 진입 시 원래 기보 저장
+
+    function initBoardLayout() {
+        let html = '';
+        for(let i=0; i<size; i++) {
+            let pos = pad + i * step;
+            html += `<line x1="${pad}" y1="${pos}" x2="${pad + (size-1)*step}" y2="${pos}" stroke="#555" stroke-width="0.8"/>`;
+            html += `<line x1="${pos}" y1="${pad}" x2="${pos}" y2="${pad + (size-1)*step}" stroke="#555" stroke-width="0.8"/>`;
+        }
+        const stars = [3, 9, 15];
+        stars.forEach(cx => {
+            stars.forEach(cy => {
+                html += `<circle cx="${pad + cx * step}" cy="${pad + cy * step}" r="2.5" fill="#333"/>`;
+            });
+        });
+        html += `<g id="stones"></g>`;
+        svg.innerHTML = html;
+    }
+
+    function parseHashData(hashString) {
+        let setupB = "", setupW = "", moves = "";
+        if (hashString.includes('B') || hashString.includes('W') || hashString.includes('_')) {
+            let parts = hashString.split('_');
+            let setupPart = parts[0];
+            moves = parts[1] || "";
+            
+            let bIdx = setupPart.indexOf('B');
+            let wIdx = setupPart.indexOf('W');
+            
+            if (bIdx !== -1 && wIdx !== -1) {
+                if (bIdx < wIdx) {
+                    setupB = setupPart.substring(bIdx + 1, wIdx);
+                    setupW = setupPart.substring(wIdx + 1);
+                } else {
+                    setupW = setupPart.substring(wIdx + 1, bIdx);
+                    setupB = setupPart.substring(bIdx + 1);
+                }
+            } else if (bIdx !== -1) {
+                setupB = setupPart.substring(bIdx + 1);
+            } else if (wIdx !== -1) {
+                setupW = setupPart.substring(wIdx + 1);
+            }
+        } else {
+            moves = hashString;
+        }
+        return { setupB, setupW, moves };
+    }
+
+    function computeBoardState(hashString, maxMoves) {
+        let board = Array(size).fill(null).map(() => Array(size).fill(null));
+        let { setupB, setupW, moves } = parseHashData(hashString);
+        
+        // 지정된 수순(maxMoves)까지만 잘라냄
+        if(maxMoves !== undefined) {
+            moves = moves.substring(0, maxMoves * 2);
+        }
+
+        // 1. 문제(사전 배치) 돌 깔기 (수순 0으로 취급)
+        for (let i = 0; i < setupB.length; i += 2) {
+            let x = chars.indexOf(setupB[i]), y = chars.indexOf(setupB[i+1]);
+            if (x >= 0 && x < size && y >= 0 && y < size) board[y][x] = { color: 'B', moveNum: 0 };
+        }
+        for (let i = 0; i < setupW.length; i += 2) {
+            let x = chars.indexOf(setupW[i]), y = chars.indexOf(setupW[i+1]);
+            if (x >= 0 && x < size && y >= 0 && y < size) board[y][x] = { color: 'W', moveNum: 0 };
+        }
+
+        // 2. 실제 수순 진행
+        let moveCount = 0;
+        let lastX = -1, lastY = -1;
+
+        for (let i = 0; i < moves.length; i += 2) {
+            let x = chars.indexOf(moves[i]), y = chars.indexOf(moves[i+1]);
+            if (x >= 0 && x < size && y >= 0 && y < size) {
+                if (board[y][x] !== null) continue;
+                moveCount++;
+                let color = (moveCount % 2 !== 0) ? 'B' : 'W';
+                board[y][x] = { color: color, moveNum: moveCount };
+                lastX = x; lastY = y;
+
+                let opponent = color === 'B' ? 'W' : 'B';
+                let dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+                
+                // 상대 돌 따내기 검사
+                dirs.forEach(([dx, dy]) => {
+                    let nx = x + dx, ny = y + dy;
+                    if (nx >= 0 && nx < size && ny >= 0 && ny < size && board[ny][nx] && board[ny][nx].color === opponent) {
+                        let group = [], liberties = new Set(), visited = Array(size).fill(false).map(() => Array(size).fill(false));
+                        function dfs(cx, cy) {
+                            visited[cy][cx] = true; group.push({x: cx, y: cy});
+                            dirs.forEach(([idx, idy]) => {
+                                let nnx = cx + idx, nny = cy + idy;
+                                if (nnx >= 0 && nnx < size && nny >= 0 && nny < size) {
+                                    if (board[nny][nnx] === null) liberties.add(`${nnx},${nny}`);
+                                    else if (board[nny][nnx] && board[nny][nnx].color === opponent && !visited[nny][nnx]) dfs(nnx, nny);
+                                }
+                            });
+                        }
+                        dfs(nx, ny);
+                        if (liberties.size === 0) group.forEach(p => { board[p.y][p.x] = null; });
+                    }
+                });
+                
+                // 자충수 검사
+                let ownLiberties = new Set(), ownVisited = Array(size).fill(false).map(() => Array(size).fill(false));
+                function dfsOwn(cx, cy) {
+                    ownVisited[cy][cx] = true;
+                    dirs.forEach(([idx, idy]) => {
+                        let nnx = cx + idx, nny = cy + idy;
+                        if (nnx >= 0 && nnx < size && nny >= 0 && nny < size) {
+                            if (board[nny][nnx] === null) ownLiberties.add(`${nnx},${nny}`);
+                            else if (board[nny][nnx] && board[nny][nnx].color === color && !ownVisited[nny][nnx]) dfsOwn(nnx, nny);
+                        }
+                    });
+                }
+                dfsOwn(x, y);
+                if (ownLiberties.size === 0) { 
+                    board[y][x] = null; 
+                    moveCount--; 
+                    if(i === moves.length - 2) { lastX = -1; lastY = -1; } 
+                }
+            }
+        }
+        return { board, moveCount, lastX, lastY };
+    }
+
+    function render() {
+        let hash = window.location.hash.substring(1);
+        let { board, moveCount, lastX, lastY } = computeBoardState(hash, currentMoveIndex);
+        let stonesGroup = document.getElementById('stones');
+        let html = '';
+        
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                if (board[y][x] !== null) {
+                    let stone = board[y][x];
+                    let cx = pad + x * step, cy = pad + y * step;
+                    let isLast = (x === lastX && y === lastY);
+                    
+                    if (stone.color === 'B') {
+                        html += `<circle cx="${cx}" cy="${cy}" r="9.3" fill="#111" stroke="#000" stroke-width="0.5"/>`;
+                    } else {
+                        html += `<circle cx="${cx}" cy="${cy}" r="9.3" fill="#fff" stroke="#999" stroke-width="0.8"/>`;
+                    }
+
+                    // 수순 표시 로직
+                    if (showMoveNumbers && stone.moveNum > 0) {
+                        let textColor = stone.color === 'B' ? 'white' : 'black';
+                        let fontSize = stone.moveNum >= 100 ? 9 : 10;
+                        html += `<text x="${cx}" y="${cy}" fill="${textColor}" font-size="${fontSize}" text-anchor="middle" dominant-baseline="central" font-family="Arial">${stone.moveNum}</text>`;
+                    } else if (isLast && !showMoveNumbers) {
+                        // 수순을 안 볼때만 마지막 수 마커 표시
+                        let markerColor = stone.color === 'B' ? 'white' : 'black';
+                        html += `<circle cx="${cx}" cy="${cy}" r="2.5" fill="${markerColor}"/>`;
+                    }
+                }
+            }
+        }
+        stonesGroup.innerHTML = html;
+        
+        // 상태창 및 입력칸 업데이트
+        let nextColor = (moveCount % 2 === 0) ? 'B' : 'W';
+        document.getElementById('turn-color').className = `turn-indicator turn-${nextColor}`;
+        let modeText = isReviewMode ? "[검토중] " : "";
+        document.getElementById('status-text').innerText = `${modeText}${nextColor === 'B' ? '흑' : '백'}의 차례 (현재 ${moveCount}수)`;
+        document.getElementById('move-input').value = moveCount;
+    }
+
+    // 바둑판 클릭 (돌 놓기)
+    document.getElementById('board-container').addEventListener('click', function(e) {
+        let rect = this.getBoundingClientRect();
+        let mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
+        let gridX = Math.round(((mouseX / rect.width) * 400 - pad) / step);
+        let gridY = Math.round(((mouseY / rect.height) * 400 - pad) / step);
+
+        if (gridX >= 0 && gridX < size && gridY >= 0 && gridY < size) {
+            let currentHash = window.location.hash.substring(1);
+            let { setupB, setupW, moves } = parseHashData(currentHash);
+            
+            // 현재 수순까지만 자르기 (이후 수순은 덮어씌워짐)
+            moves = moves.substring(0, currentMoveIndex * 2);
+            
+            let nextMove = chars[gridX] + chars[gridY];
+            let newMoves = moves + nextMove;
+            
+            let newHash = "";
+            if (setupB || setupW) {
+                if (setupB) newHash += "B" + setupB;
+                if (setupW) newHash += "W" + setupW;
+                newHash += "_" + newMoves;
+            } else {
+                newHash = newMoves;
+            }
+            window.location.hash = newHash; // 해시가 변경되면 hashchange 이벤트가 발생하여 렌더링됨
+        }
+    });
+
+    // 해시 변경 감지 (새로운 돌 착수, URL 붙여넣기 등)
+    window.addEventListener('hashchange', () => {
+        let currentHash = window.location.hash.substring(1);
+        let { moves } = parseHashData(currentHash);
+        currentMoveIndex = moves.length / 2; // 가장 마지막 수로 인덱스 맞춤
+        render();
+    });
+
+    // --- 새로운 기능 함수들 ---
+
+    // 수순 보기 토글
+    function toggleMoveNumbers() {
+        showMoveNumbers = !showMoveNumbers;
+        render();
+    }
+
+    // 한수 전으로
+    function goPrevMove() {
+        if (currentMoveIndex > 0) {
+            currentMoveIndex--;
+            render();
+        }
+    }
+
+    // 한수 이후로
+    function goNextMove() {
+        let { moves } = parseHashData(window.location.hash.substring(1));
+        let maxMoves = moves.length / 2;
+        if (currentMoveIndex < maxMoves) {
+            currentMoveIndex++;
+            render();
+        }
+    }
+
+    // 네모 입력칸 엔터키 처리
+    function handleInputEnter(e) {
+        if (e.key === 'Enter') {
+            document.getElementById('move-input').blur(); // blur 발생시켜 jumpToMove 호출
+        }
+    }
+
+    // 네모 입력칸 수순 점프
+    function jumpToMove() {
+        let targetMove = parseInt(document.getElementById('move-input').value);
+        let { moves } = parseHashData(window.location.hash.substring(1));
+        let maxMoves = moves.length / 2;
+        
+        if (isNaN(targetMove) || targetMove < 0) targetMove = 0;
+        if (targetMove > maxMoves) targetMove = maxMoves;
+        
+        currentMoveIndex = targetMove;
+        render();
+    }
+
+    // 검토 모드 토글
+    function toggleReviewMode() {
+        let btn = document.getElementById('btn-review');
+        isReviewMode = !isReviewMode;
+        
+        if (isReviewMode) {
+            // 검토 모드 진입: 현재 전체 해시와 보고 있는 인덱스 저장
+            savedReviewState = { 
+                hash: window.location.hash, 
+                index: currentMoveIndex 
+            };
+            btn.classList.add('active');
+            btn.innerText = '🛑 검토 종료';
+            // 검토를 시작하면 보여지는 수순까지만 잘라서 새 가지를 만듦
+            let { setupB, setupW, moves } = parseHashData(window.location.hash.substring(1));
+            moves = moves.substring(0, currentMoveIndex * 2);
+            let newHash = "";
+            if(setupB) newHash += "B" + setupB;
+            if(setupW) newHash += "W" + setupW;
+            if(setupB || setupW) newHash += "_" + moves;
+            else newHash = moves;
+            // history에 남기지 않기 위해 replace 사용 권장, 여기서는 단순 구현을 위해 hash 직접 변경
+            window.location.hash = newHash; 
+        } else {
+            // 검토 모드 종료: 저장해둔 해시와 인덱스로 복구
+            window.location.hash = savedReviewState.hash || '';
+            currentMoveIndex = savedReviewState.index;
+            savedReviewState = null;
+            btn.classList.remove('active');
+            btn.innerText = '🔍 검토';
+        }
+        render();
+    }
+
+    // 키보드 방향키 조작 (입력칸에 포커스가 없을 때만)
+    document.addEventListener('keydown', (e) => {
+        if (document.activeElement.tagName === 'INPUT') return;
+        if (e.key === 'ArrowLeft') goPrevMove();
+        if (e.key === 'ArrowRight') goNextMove();
+    });
+
+    // --- 기존 파일/링크 기능들 ---
+    function loadSGFFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const content = e.target.result;
+            let setupB = "", setupW = "", hasSetup = false;
+
+            const abMatches = content.match(/AB(\[[a-zA-Z]{2}\])+/g);
+            if (abMatches) {
+                hasSetup = true;
+                abMatches.forEach(m => {
+                    let coords = m.match(/\[([a-zA-Z]{2})\]/g);
+                    if(coords) coords.forEach(c => setupB += c.slice(1,3).toLowerCase());
+                });
+            }
+
+            const awMatches = content.match(/AW(\[[a-zA-Z]{2}\])+/g);
+            if (awMatches) {
+                hasSetup = true;
+                awMatches.forEach(m => {
+                    let coords = m.match(/\[([a-zA-Z]{2})\]/g);
+                    if(coords) coords.forEach(c => setupW += c.slice(1,3).toLowerCase());
+                });
+            }
+
+            let movesHash = "";
+            const regex = /;[BW]\[([a-zA-Z]{2})\]/g;
+            let match;
+            while ((match = regex.exec(content)) !== null) {
+                movesHash += match[1].toLowerCase();
+            }
+
+            let newHash = "";
+            if (hasSetup) {
+                if (setupB) newHash += "B" + setupB;
+                if (setupW) newHash += "W" + setupW;
+                newHash += "_" + movesHash;
+            } else {
+                newHash = movesHash;
+            }
+            window.location.hash = newHash;
+            event.target.value = ''; 
+        };
+        reader.readAsText(file);
+    }
+
+    function downloadSGF() {
+        let hash = window.location.hash.substring(1);
+        if (!hash) { alert("저장할 기보가 없습니다!"); return; }
+
+        let { setupB, setupW, moves } = parseHashData(hash);
+        let sgfContent = "(;GM[1]FF[4]SZ[19]AP[BadukWeb:3.0]DT[" + new Date().toISOString().slice(0,10) + "]";
+        
+        if (setupB) {
+            sgfContent += "AB";
+            for(let i=0; i<setupB.length; i+=2) sgfContent += `[${setupB[i]}${setupB[i+1]}]`;
+        }
+        if (setupW) {
+            sgfContent += "AW";
+            for(let i=0; i<setupW.length; i+=2) sgfContent += `[${setupW[i]}${setupW[i+1]}]`;
+        }
+
+        for (let i = 0; i < moves.length; i += 2) {
+            let x = moves[i], y = moves[i+1];
+            let color = (i/2 % 2 === 0) ? 'B' : 'W';
+            sgfContent += `;${color}[${x}${y}]`;
+        }
+        sgfContent += ")";
+
+        const blob = new Blob([sgfContent], { type: 'application/x-go-sgf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = "baduk_game.sgf";
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function copyLink() {
+        navigator.clipboard.writeText(window.location.href).then(() => alert("🔗 링크가 복사되었습니다!"));
+    }
+
+    // 초기화
+    initBoardLayout();
+    let initialHash = window.location.hash.substring(1);
+    if(initialHash) {
+        let { moves } = parseHashData(initialHash);
+        currentMoveIndex = moves.length / 2;
+    }
+    render();
+</script>
+
+</body>
+</html>
