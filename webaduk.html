@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>웹 바둑판</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f0f2f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+        
+        /* PC 및 Dex 화면: 가로 배치 (좌 바둑판, 우 사이드바) */
+        .container { 
+            background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
+            display: flex; flex-direction: row; align-items: flex-start; justify-content: center; 
+            width: 100%; max-width: 1200px; gap: 25px;
+        }
+        
+        /* 바둑판 영역 (크기 붕괴 방지 최적화) */
+        #board-container { 
+            position: relative; 
+            background-color: #e6b873; border: 2px solid #b38644; box-shadow: inset 0 0 10px rgba(0,0,0,0.15); 
+            cursor: pointer; border-radius: 4px; -webkit-user-select: none; user-select: none;
+            width: 100%; flex-shrink: 0; max-width: calc(100vh - 80px); aspect-ratio: 1 / 1;
+        }
+        svg { width: 100%; height: 100%; display: block; }
+        
+        /* 우측 사이드바 (상태창 및 7줄 버튼 영역) */
+        .sidebar {
+            flex: 0 0 260px; display: flex; flex-direction: column; gap: 12px; width: 100%;
+        }
+
+        .status-box { padding: 12px; background: #f9fafb; border-radius: 6px; font-size: 14px; font-weight: bold; color: #333; text-align: center; border: 1px solid #e5e7eb; }
+        .turn-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+        .turn-B { background: black; }
+        .turn-W { background: white; border: 1px solid #ccc; }
+
+        /* 국면 조작 버튼 7줄 레이아웃 */
+        .controls-container { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+        .ctrl-row { width: 100%; display: flex; }
+        
+        button { border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s; -webkit-tap-highlight-color: transparent; font-family: inherit; }
+        button:active { transform: scale(0.97); }
+        
+        .ctrl-row > button { width: 100%; padding: 11px 10px; font-size: 14px; font-weight: bold; text-align: center; }
+        
+        /* 버튼 색상 테마 */
+        .btn-primary { background-color: #4f46e5; color: white; }
+        .btn-info { background-color: #0284c7; color: white; }
+        .btn-download { background-color: #059669; color: white; }
+        .btn-upload { background-color: #d97706; color: white; } 
+        .btn-review { background-color: #9333ea; color: white; }
+        .btn-review.active { background-color: #dc2626; animation: pulse 1.5s infinite; }
+        .btn-capture { background-color: #be185d; color: white; }
+        
+        /* 7번째 줄: 방향키 및 텍스트 박스 */
+        .nav-row { gap: 6px; justify-content: space-between; align-items: center; }
+        .btn-nav { background-color: #4b5563; color: white; flex: 1; padding: 11px 0; font-size: 15px; font-weight: bold; }
+        #move-input { width: 65px; height: 39px; text-align: center; font-size: 15px; font-weight: bold; border: 2px solid #ccc; border-radius: 6px; outline: none; flex-shrink: 0; }
+        #move-input:focus { border-color: #4f46e5; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
+        /* 모바일 대응 (화면 폭 800px 이하) */
+        @media (max-width: 800px) {
+            body { padding: 0; background-color: white; align-items: flex-start; }
+            .container { flex-direction: column; align-items: center; padding: 15px; border-radius: 0; box-shadow: none; gap: 15px; }
+            /* 모바일에서 바둑판 화면 좌우에 꽉 차도록 패딩 무시 */
+            #board-container { width: 100vw; max-width: 100vw; border-left: none; border-right: none; border-radius: 0; margin-left: -15px; margin-right: -15px; }
+            .sidebar { flex: none; max-width: 400px; padding: 0; }
+            .ctrl-row > button { padding: 9px 10px; font-size: 13px; }
+            .btn-nav { padding: 9px 0; font-size: 14px; }
+            #move-input { height: 35px; font-size: 13px; width: 55px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="board-container">
+        <svg id="baduk-board" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+
+    <div class="sidebar">
+        <div class="status-box">
+            <span id="turn-color" class="turn-indicator turn-B"></span>
+            <span id="status-text">대기 중</span>
+        </div>
+
+        <input type="file" id="sgf-file-input" accept=".sgf" style="display: none;" onchange="loadSGFFile(event)">
+
+        <div class="controls-container">
+            <div class="ctrl-row"><button class="btn-primary" onclick="copyLink()">🔗 링크복사</button></div>
+            <div class="ctrl-row"><button class="btn-info" onclick="toggleMoveNumbers()">🔢 수순보기</button></div>
+            <div class="ctrl-row"><button class="btn-download" onclick="downloadSGF()">💾 SGF저장</button></div>
+            <div class="ctrl-row"><button class="btn-upload" onclick="document.getElementById('sgf-file-input').click()">📂 SGF열기</button></div>
+            <div class="ctrl-row"><button id="btn-review" class="btn-review" onclick="toggleReviewMode()">🔍 검토</button></div>
+            <div class="ctrl-row"><button class="btn-capture" onclick="captureBoard()">📸 캡쳐</button></div>
+            <div class="ctrl-row nav-row">
+                <button class="btn-nav" onclick="goPrevMove()" title="왼쪽 방향키">◀</button>
+                <input type="number" id="move-input" min="0" value="0" onkeydown="handleInputEnter(event)" onblur="jumpToMove()">
+                <button class="btn-nav" onclick="goNextMove()" title="오른쪽 방향키">▶</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const size = 19;
+    const chars = 'abcdefghijklmnopqrs';
+    const svg = document.getElementById('baduk-board');
+    const SVG_NS = "http://www.w3.org/2000/svg"; // SVG 요소 생성을 위한 필수 네임스페이스
+    const pad = 20, step = 20;
+
+    let currentMoveIndex = 0;       
+    let showMoveNumbers = false;    
+    let isReviewMode = false;       
+    let savedReviewState = null;    
+
+    // 💡 바둑판 선이 사라지는 오류를 해결하기 위해 완벽한 DOM 방식으로 재작성
+    function initBoardLayout() {
+        while (svg.firstChild) {
+            svg.removeChild(svg.firstChild);
+        }
+
+        // 바둑판 선 그리기
+        for(let i=0; i<size; i++) {
+            let pos = pad + i * step;
+            
+            let hLine = document.createElementNS(SVG_NS, "line");
+            hLine.setAttribute("x1", pad); hLine.setAttribute("y1", pos);
+            hLine.setAttribute("x2", pad + (size-1)*step); hLine.setAttribute("y2", pos);
+            hLine.setAttribute("stroke", "#555"); hLine.setAttribute("stroke-width", "0.8");
+            svg.appendChild(hLine);
+            
+            let vLine = document.createElementNS(SVG_NS, "line");
+            vLine.setAttribute("x1", pos); vLine.setAttribute("y1", pad);
+            vLine.setAttribute("x2", pos); vLine.setAttribute("y2", pad + (size-1)*step);
+            vLine.setAttribute("stroke", "#555"); vLine.setAttribute("stroke-width", "0.8");
+            svg.appendChild(vLine);
+        }
+
+        // 화점 그리기
+        const stars = [3, 9, 15];
+        stars.forEach(cx => {
+            stars.forEach(cy => {
+                let circle = document.createElementNS(SVG_NS, "circle");
+                circle.setAttribute("cx", pad + cx * step);
+                circle.setAttribute("cy", pad + cy * step);
+                circle.setAttribute("r", "2.5");
+                circle.setAttribute("fill", "#333");
+                svg.appendChild(circle);
+            });
+        });
+
+        // 착수(돌)를 담을 그룹 생성
+        let stonesGroup = document.createElementNS(SVG_NS, "g");
+        stonesGroup.setAttribute("id", "stones");
+        svg.appendChild(stonesGroup);
+    }
+
+    function parseHashData(hashString) {
+        let setupB = "", setupW = "", moves = "";
+        if (hashString.includes('B') || hashString.includes('W') || hashString.includes('_')) {
+            let parts = hashString.split('_');
+            let setupPart = parts[0];
+            moves = parts[1] || "";
+            
+            let bIdx = setupPart.indexOf('B');
+            let wIdx = setupPart.indexOf('W');
+            
+            if (bIdx !== -1 && wIdx !== -1) {
+                if (bIdx < wIdx) {
+                    setupB = setupPart.substring(bIdx + 1, wIdx);
+                    setupW = setupPart.substring(wIdx + 1);
+                } else {
+                    setupW = setupPart.substring(wIdx + 1, bIdx);
+                    setupB = setupPart.substring(bIdx + 1);
+                }
+            } else if (bIdx !== -1) {
+                setupB = setupPart.substring(bIdx + 1);
+            } else if (wIdx !== -1) {
+                setupW = setupPart.substring(wIdx + 1);
+            }
+        } else {
+            moves = hashString;
+        }
+        return { setupB, setupW, moves };
+    }
+
+    function computeBoardState(hashString, maxMoves) {
+        let board = Array(size).fill(null).map(() => Array(size).fill(null));
+        let { setupB, setupW, moves } = parseHashData(hashString);
+        
+        if(maxMoves !== undefined) {
+            moves = moves.substring(0, maxMoves * 2);
+        }
+
+        for (let i = 0; i < setupB.length; i += 2) {
+            let x = chars.indexOf(setupB[i]), y = chars.indexOf(setupB[i+1]);
+            if (x >= 0 && x < size && y >= 0 && y < size) board[y][x] = { color: 'B', moveNum: 0 };
+        }
+        for (let i = 0; i < setupW.length; i += 2) {
+            let x = chars.indexOf(setupW[i]), y = chars.indexOf(setupW[i+1]);
+            if (x >= 0 && x < size && y >= 0 && y < size) board[y][x] = { color: 'W', moveNum: 0 };
+        }
+
+        let moveCount = 0;
+        let lastX = -1, lastY = -1;
+
+        for (let i = 0; i < moves.length; i += 2) {
+            let x = chars.indexOf(moves[i]), y = chars.indexOf(moves[i+1]);
+            if (x >= 0 && x < size && y >= 0 && y < size) {
+                if (board[y][x] !== null) continue;
+                moveCount++;
+                let color = (moveCount % 2 !== 0) ? 'B' : 'W';
+                board[y][x] = { color: color, moveNum: moveCount };
+                lastX = x; lastY = y;
+
+                let opponent = color === 'B' ? 'W' : 'B';
+                let dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+                
+                dirs.forEach(([dx, dy]) => {
+                    let nx = x + dx, ny = y + dy;
+                    if (nx >= 0 && nx < size && ny >= 0 && ny < size && board[ny][nx] && board[ny][nx].color === opponent) {
+                        let group = [], liberties = new Set(), visited = Array(size).fill(false).map(() => Array(size).fill(false));
+                        function dfs(cx, cy) {
+                            visited[cy][cx] = true; group.push({x: cx, y: cy});
+                            dirs.forEach(([idx, idy]) => {
+                                let nnx = cx + idx, nny = cy + idy;
+                                if (nnx >= 0 && nnx < size && nny >= 0 && nny < size) {
+                                    if (board[nny][nnx] === null) liberties.add(`${nnx},${nny}`);
+                                    else if (board[nny][nnx] && board[nny][nnx].color === opponent && !visited[nny][nnx]) dfs(nnx, nny);
+                                }
+                            });
+                        }
+                        dfs(nx, ny);
+                        if (liberties.size === 0) group.forEach(p => { board[p.y][p.x] = null; });
+                    }
+                });
+                
+                let ownLiberties = new Set(), ownVisited = Array(size).fill(false).map(() => Array(size).fill(false));
+                function dfsOwn(cx, cy) {
+                    ownVisited[cy][cx] = true;
+                    dirs.forEach(([idx, idy]) => {
+                        let nnx = cx + idx, nny = cy + idy;
+                        if (nnx >= 0 && nnx < size && nny >= 0 && nny < size) {
+                            if (board[nny][nnx] === null) ownLiberties.add(`${nnx},${nny}`);
+                            else if (board[nny][nnx] && board[nny][nnx].color === color && !ownVisited[nny][nnx]) dfsOwn(nnx, nny);
+                        }
+                    });
+                }
+                dfsOwn(x, y);
+                if (ownLiberties.size === 0) { 
+                    board[y][x] = null; 
+                    moveCount--; 
+                    if(i === moves.length - 2) { lastX = -1; lastY = -1; } 
+                }
+            }
+        }
+        return { board, moveCount, lastX, lastY };
+    }
+
+    // 💡 렌더링 방식도 안전한 DOM 방식으로 수정
+    function render() {
+        let hash = window.location.hash.substring(1);
+        let { board, moveCount, lastX, lastY } = computeBoardState(hash, currentMoveIndex);
+        let stonesGroup = document.getElementById('stones');
+        
+        while (stonesGroup.firstChild) {
+            stonesGroup.removeChild(stonesGroup.firstChild);
+        }
+        
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                if (board[y][x] !== null) {
+                    let stone = board[y][x];
+                    let cx = pad + x * step, cy = pad + y * step;
+                    
+                    let circle = document.createElementNS(SVG_NS, "circle");
+                    circle.setAttribute("cx", cx); circle.setAttribute("cy", cy); circle.setAttribute("r", "9.3");
+                    circle.setAttribute("fill", stone.color === 'B' ? "#111" : "#fff");
+                    circle.setAttribute("stroke", stone.color === 'B' ? "#000" : "#999");
+                    circle.setAttribute("stroke-width", stone.color === 'B' ? "0.5" : "0.8");
+                    stonesGroup.appendChild(circle);
+
+                    if (showMoveNumbers && stone.moveNum > 0) {
+                        let text = document.createElementNS(SVG_NS, "text");
+                        text.setAttribute("x", cx); text.setAttribute("y", cy);
+                        text.setAttribute("fill", stone.color === 'B' ? "white" : "black");
+                        text.setAttribute("font-size", stone.moveNum >= 100 ? "9" : "10");
+                        text.setAttribute("text-anchor", "middle"); text.setAttribute("dominant-baseline", "central");
+                        text.setAttribute("font-family", "Arial, sans-serif");
+                        text.textContent = stone.moveNum;
+                        stonesGroup.appendChild(text);
+                    } else if (x === lastX && y === lastY && !showMoveNumbers) {
+                        let marker = document.createElementNS(SVG_NS, "circle");
+                        marker.setAttribute("cx", cx); marker.setAttribute("cy", cy); marker.setAttribute("r", "2.5");
+                        marker.setAttribute("fill", stone.color === 'B' ? "white" : "black");
+                        stonesGroup.appendChild(marker);
+                    }
+                }
+            }
+        }
+        
+        let nextColor = (moveCount % 2 === 0) ? 'B' : 'W';
+        document.getElementById('turn-color').className = `turn-indicator turn-${nextColor}`;
+        let modeText = isReviewMode ? "[검토중] " : "";
+        document.getElementById('status-text').innerText = `${modeText}${nextColor === 'B' ? '흑' : '백'}의 차례 (현재 ${moveCount}수)`;
+        document.getElementById('move-input').value = moveCount;
+    }
+
+    document.getElementById('board-container').addEventListener('click', function(e) {
+        let rect = this.getBoundingClientRect();
+        let mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
+        let gridX = Math.round(((mouseX / rect.width) * 400 - pad) / step);
+        let gridY = Math.round(((mouseY / rect.height) * 400 - pad) / step);
+
+        if (gridX >= 0 && gridX < size && gridY >= 0 && gridY < size) {
+            let currentHash = window.location.hash.substring(1);
+            let { setupB, setupW, moves } = parseHashData(currentHash);
+            
+            moves = moves.substring(0, currentMoveIndex * 2);
+            let nextMove = chars[gridX] + chars[gridY];
+            let newMoves = moves + nextMove;
+            
+            let newHash = "";
+            if (setupB || setupW) {
+                if (setupB) newHash += "B" + setupB;
+                if (setupW) newHash += "W" + setupW;
+                newHash += "_" + newMoves;
+            } else {
+                newHash = newMoves;
+            }
+            window.location.hash = newHash; 
+        }
+    });
+
+    window.addEventListener('hashchange', () => {
+        let currentHash = window.location.hash.substring(1);
+        let { moves } = parseHashData(currentHash);
+        
+        if (window.isSgfFileLoading) {
+            if (window.loadedSgfIsProblem) currentMoveIndex = 0; 
+            else currentMoveIndex = moves.length / 2; 
+            window.isSgfFileLoading = false;
+        } else {
+            currentMoveIndex = moves.length / 2;
+        }
+        render();
+    });
+
+    function toggleMoveNumbers() { showMoveNumbers = !showMoveNumbers; render(); }
+    function goPrevMove() { if (currentMoveIndex > 0) { currentMoveIndex--; render(); } }
+    function goNextMove() {
+        let { moves } = parseHashData(window.location.hash.substring(1));
+        if (currentMoveIndex < moves.length / 2) { currentMoveIndex++; render(); }
+    }
+    function handleInputEnter(e) { if (e.key === 'Enter') document.getElementById('move-input').blur(); }
+    function jumpToMove() {
+        let targetMove = parseInt(document.getElementById('move-input').value);
+        let { moves } = parseHashData(window.location.hash.substring(1));
+        let maxMoves = moves.length / 2;
+        if (isNaN(targetMove) || targetMove < 0) targetMove = 0;
+        if (targetMove > maxMoves) targetMove = maxMoves;
+        currentMoveIndex = targetMove; render();
+    }
+
+    function toggleReviewMode() {
+        let btn = document.getElementById('btn-review');
+        isReviewMode = !isReviewMode;
+        
+        if (isReviewMode) {
+            savedReviewState = { hash: window.location.hash, index: currentMoveIndex };
+            btn.classList.add('active');
+            btn.innerText = '🛑 검토 종료';
+            let { setupB, setupW, moves } = parseHashData(window.location.hash.substring(1));
+            moves = moves.substring(0, currentMoveIndex * 2);
+            let newHash = "";
+            if(setupB) newHash += "B" + setupB;
+            if(setupW) newHash += "W" + setupW;
+            if(setupB || setupW) newHash += "_" + moves; else newHash = moves;
+            window.location.hash = newHash; 
+        } else {
+            window.location.hash = savedReviewState.hash || '';
+            currentMoveIndex = savedReviewState.index;
+            savedReviewState = null;
+            btn.classList.remove('active');
+            btn.innerText = '🔍 검토';
+        }
+        render();
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (document.activeElement.tagName === 'INPUT') return;
+        if (e.key === 'ArrowLeft') goPrevMove();
+        if (e.key === 'ArrowRight') goNextMove();
+    });
+
+    function captureBoard() {
+        const svgElement = document.getElementById('baduk-board');
+        let svgString = new XMLSerializer().serializeToString(svgElement);
+        if (!svgString.includes('xmlns="http://www.w3.org/2000/svg"')) svgString = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+
+        const size = 800; 
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#e6b873'; ctx.fillRect(0, 0, size, size);
+        ctx.strokeStyle = '#b38644'; ctx.lineWidth = 12; ctx.strokeRect(0, 0, size, size);
+
+        const img = new Image();
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+
+        img.onload = function() {
+            ctx.drawImage(img, 0, 0, size, size);
+            URL.revokeObjectURL(url);
+            const a = document.createElement('a');
+            a.download = `baduk_capture_${new Date().toISOString().slice(0,10).replace(/-/g, "")}.png`;
+            a.href = canvas.toDataURL('image/png');
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        };
+        img.src = url;
+    }
+
+    // 💡 SGF 파일 정답 변환 로직 (오타 수정 반영)
+    function loadSGFFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            let content = e.target.result;
+            
+            let problem_node = content;
+            let remainder = "";
+            let nodeStart = content.indexOf('(;');
+            if (nodeStart !== -1) {
+                let insideBracket = false, escapeNext = false;
+                for(let i = nodeStart + 2; i < content.length; i++) {
+                    let char = content[i];
+                    if(escapeNext) { escapeNext = false; continue; }
+                    if(char === '\\') { escapeNext = true; continue; }
+                    if(char === '[') insideBracket = true;
+                    else if(char === ']') insideBracket = false;
+                    else if(!insideBracket) {
+                        if(char === ';' || char === '(') {
+                            problem_node = content.substring(0, i).trim();
+                            if(!problem_node.endsWith(')')) problem_node += ')';
+                            remainder = content.substring(i);
+                            if(remainder.startsWith(';')) remainder = '(' + remainder;
+                            break;
+                        } else if (char === ')') {
+                            problem_node = content.substring(0, i+1);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            let isProblem = problem_node.includes('AB[') || problem_node.includes('AW[');
+            let flipX = false, flipY = false, isWhiteFirst = false;
+
+            if (isProblem) {
+                let allCoords = [];
+                let coordRegex = /(AB|AW|AE|B|W|TB|TW|TR|SQ|CR|MA)((?:\[[a-zA-Z]{2}\]\s*)+)/g;
+                let match;
+                while((match = coordRegex.exec(content)) !== null) {
+                    let coords = match[2].match(/\[([a-zA-Z]{2})\]/g);
+                    if(coords) {
+                        coords.forEach(c => {
+                            let x = c.charCodeAt(1) - 97, y = c.charCodeAt(2) - 97;
+                            if(x >= 0 && x < 19 && y >= 0 && y < 19) allCoords.push({x, y});
+                        });
+                    }
+                }
+                if(allCoords.length > 0) {
+                    let avgX = allCoords.reduce((sum, c) => sum + c.x, 0) / allCoords.length;
+                    let avgY = allCoords.reduce((sum, c) => sum + c.y, 0) / allCoords.length;
+                    flipX = avgX > 9;
+                    flipY = avgY < 9;
+                }
+
+                let firstMoveMatch = remainder.match(/;([BW])\[/i);
+                if (firstMoveMatch && firstMoveMatch[1].toUpperCase() === 'W') {
+                    isWhiteFirst = true;
+                }
+            }
+
+            function transformStr(str) {
+                let x = str.charCodeAt(0) - 97, y = str.charCodeAt(1) - 97;
+                let nx = flipX ? 18 - x : x;
+                let ny = flipY ? 18 - y : y;
+                return String.fromCharCode(nx + 97) + String.fromCharCode(ny + 97);
+            }
+
+            let setupB_arr = [], setupW_arr = [];
+            let abMatches = problem_node.match(/AB(\[[a-zA-Z]{2}\])+/g);
+            if(abMatches) {
+                abMatches.forEach(m => {
+                    let coords = m.match(/\[([a-zA-Z]{2})\]/g);
+                    if(coords) coords.forEach(c => setupB_arr.push(c.slice(1,3).toLowerCase()));
+                });
+            }
+            let awMatches = problem_node.match(/AW(\[[a-zA-Z]{2}\])+/g);
+            if(awMatches) {
+                awMatches.forEach(m => {
+                    let coords = m.match(/\[([a-zA-Z]{2})\]/g);
+                    if(coords) coords.forEach(c => setupW_arr.push(c.slice(1,3).toLowerCase()));
+                });
+            }
+
+            let finalSetupB = isWhiteFirst ? setupW_arr : setupB_arr;
+            let finalSetupW = isWhiteFirst ? setupB_arr : setupW_arr;
+            
+            let setupB_str = finalSetupB.map(transformStr).join('');
+            let setupW_str = finalSetupW.map(transformStr).join('');
+
+            let allPaths = [], currentPath = [], stack = [], lastOp = null, i = 0;
+            while (i < remainder.length) {
+                let c = remainder[i];
+                if (c === '(') {
+                    stack.push([...currentPath]); lastOp = '('; i++;
+                } else if (c === ')') {
+                    if (lastOp === 'node' && currentPath.length > 0) allPaths.push([...currentPath]);
+                    if (stack.length > 0) currentPath = stack.pop();
+                    lastOp = ')'; i++;
+                } else if (c === ';') {
+                    let start = i; i++;
+                    let inBracket = false, escape = false;
+                    while (i < remainder.length) {
+                        let ch = remainder[i];
+                        if (escape) escape = false;
+                        else if (ch === '\\') escape = true;
+                        else if (ch === '[') inBracket = true;
+                        else if (ch === ']') inBracket = false;
+                        else if (!inBracket && (ch === ';' || ch === '(' || ch === ')')) break;
+                        i++;
+                    }
+                    currentPath.push(remainder.substring(start, i)); lastOp = 'node';
+                } else {
+                    i++;
+                }
+            }
+            if (lastOp === 'node' && currentPath.length > 0) allPaths.push([...currentPath]);
+
+            let correctPaths = allPaths.filter(path => {
+                if(path.length === 0) return false;
+                let lastNode = path[path.length - 1];
+                if(/C\[.*?correct.*?\]/i.test(lastNode) || lastNode.includes('CR[')) return true;
+                if(!/[BW]\[[a-zA-Z]{2}\]/.test(lastNode) && path.length > 1) {
+                    let prevNode = path[path.length - 2];
+                    if(/C\[.*?correct.*?\]/i.test(prevNode) || prevNode.includes('CR[')) return true;
+                }
+                return false;
+            });
+
+            let targetPaths = correctPaths.length > 0 ? correctPaths : allPaths;
+            let bestPath = targetPaths.length > 0 ? targetPaths[0] : [];
+
+            let movesHash = "";
+            bestPath.forEach(node => {
+                let moveMatch = [...node.matchAll(/[BW]\[([a-zA-Z]{2})\]/gi)];
+                moveMatch.forEach(m => {
+                    movesHash += transformStr(m[1].toLowerCase());
+                });
+            });
+
+            let hasSetup = (setupB_str.length > 0 || setupW_str.length > 0);
+            let newHash = "";
+            if (hasSetup) {
+                if (setupB_str) newHash += "B" + setupB_str;
+                if (setupW_str) newHash += "W" + setupW_str;
+                newHash += "_" + movesHash;
+            } else {
+                newHash = movesHash;
+            }
+
+            window.isSgfFileLoading = true;
+            window.loadedSgfIsProblem = isProblem;
+            window.location.hash = newHash;
+            event.target.value = ''; 
+        };
+        reader.readAsText(file);
+    }
+
+    function downloadSGF() {
+        let hash = window.location.hash.substring(1);
+        if (!hash) { alert("저장할 기보가 없습니다!"); return; }
+
+        let { setupB, setupW, moves } = parseHashData(hash);
+        let sgfContent = "(;GM[1]FF[4]SZ[19]AP[BadukWeb:3.0]DT[" + new Date().toISOString().slice(0,10) + "]";
+        
+        if (setupB) {
+            sgfContent += "AB";
+            for(let i=0; i<setupB.length; i+=2) sgfContent += `[${setupB[i]}${setupB[i+1]}]`;
+        }
+        if (setupW) {
+            sgfContent += "AW";
+            for(let i=0; i<setupW.length; i+=2) sgfContent += `[${setupW[i]}${setupW[i+1]}]`;
+        }
+
+        for (let i = 0; i < moves.length; i += 2) {
+            let x = moves[i], y = moves[i+1];
+            let color = (i/2 % 2 === 0) ? 'B' : 'W';
+            sgfContent += `;${color}[${x}${y}]`;
+        }
+        sgfContent += ")";
+
+        const blob = new Blob([sgfContent], { type: 'application/x-go-sgf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = "baduk_game.sgf";
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function copyLink() {
+        navigator.clipboard.writeText(window.location.href).then(() => alert("🔗 링크가 복사되었습니다!"));
+    }
+
+    // 시스템 초기 실행부
+    initBoardLayout();
+    let initialHash = window.location.hash.substring(1);
+    if(initialHash) {
+        let { setupB, setupW, moves } = parseHashData(initialHash);
+        if (setupB || setupW) currentMoveIndex = 0;
+        else currentMoveIndex = moves.length / 2;
+    }
+    render();
+</script>
+
+</body>
+</html>
