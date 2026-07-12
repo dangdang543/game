@@ -274,6 +274,7 @@
         document.getElementById('move-input').value = moveCount;
     }
 
+    // 💡 [수정된 부분] 클릭 시 돌 중복 착점 방지 로직이 적용된 리스너
     document.getElementById('board-container').addEventListener('click', function(e) {
         let rect = this.getBoundingClientRect();
         let mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
@@ -282,6 +283,13 @@
 
         if (gridX >= 0 && gridX < size && gridY >= 0 && gridY < size) {
             let currentHash = window.location.hash.substring(1);
+            
+            // 현재 바둑판 상태를 가져와서 클릭한 위치에 이미 돌이 있는지 확인합니다.
+            let { board } = computeBoardState(currentHash, currentMoveIndex);
+            if (board[gridY][gridX] !== null) {
+                return; // 이미 돌이 있는 자리라면 아무것도 하지 않고 함수를 종료합니다.
+            }
+            
             let { setupB, setupW, moves } = parseHashData(currentHash);
             
             moves = moves.substring(0, currentMoveIndex * 2);
@@ -391,7 +399,6 @@
         img.src = url;
     }
 
-    // 💡 [핵심 수정 부분] 파이썬 사활 변환 로직 JS 이식
     function loadSGFFile(event) {
         const file = event.target.files[0];
         if (!file) return;
