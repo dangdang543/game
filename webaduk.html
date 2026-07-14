@@ -274,7 +274,6 @@
         document.getElementById('move-input').value = moveCount;
     }
 
-    // 💡 [수정된 부분] 클릭 시 돌 중복 착점 방지 로직이 적용된 리스너
     document.getElementById('board-container').addEventListener('click', function(e) {
         let rect = this.getBoundingClientRect();
         let mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
@@ -284,10 +283,9 @@
         if (gridX >= 0 && gridX < size && gridY >= 0 && gridY < size) {
             let currentHash = window.location.hash.substring(1);
             
-            // 현재 바둑판 상태를 가져와서 클릭한 위치에 이미 돌이 있는지 확인합니다.
             let { board } = computeBoardState(currentHash, currentMoveIndex);
             if (board[gridY][gridX] !== null) {
-                return; // 이미 돌이 있는 자리라면 아무것도 하지 않고 함수를 종료합니다.
+                return; 
             }
             
             let { setupB, setupW, moves } = parseHashData(currentHash);
@@ -438,9 +436,9 @@
             let flipX = false, flipY = false, isWhiteFirst = false;
 
             if (isProblem) {
-                // 평균 좌표(중심점) 확인 -> 좌하귀 회전 여부 판단
+                // 평균 좌표(중심점) 확인 -> 좌하귀 회전 여부 판단 (줄바꿈 대응 정규식 수정)
                 let allCoords = [];
-                let coordRegex = /(AB|AW|AE|B|W|TB|TW|TR|SQ|CR|MA)((?:\[[a-zA-Z]{2}\]\s*)+)/g;
+                let coordRegex = /(AB|AW|AE|B|W|TB|TW|TR|SQ|CR|MA)((?:[\s]*\[[a-zA-Z]{2}\])+)/g;
                 let match;
                 while((match = coordRegex.exec(content)) !== null) {
                     let coords = match[2].match(/\[([a-zA-Z]{2})\]/g);
@@ -473,16 +471,16 @@
                 return String.fromCharCode(nx + 97) + String.fromCharCode(ny + 97);
             }
 
-            // 2. 세팅 돌 (AB, AW) 추출 및 변환
+            // 2. 세팅 돌 (AB, AW) 추출 및 변환 (줄바꿈 대응 정규식 수정)
             let setupB_arr = [], setupW_arr = [];
-            let abMatches = problem_node.match(/AB(\[[a-zA-Z]{2}\])+/g);
+            let abMatches = problem_node.match(/AB(?:[\s]*\[[a-zA-Z]{2}\])+/g);
             if(abMatches) {
                 abMatches.forEach(m => {
                     let coords = m.match(/\[([a-zA-Z]{2})\]/g);
                     if(coords) coords.forEach(c => setupB_arr.push(c.slice(1,3).toLowerCase()));
                 });
             }
-            let awMatches = problem_node.match(/AW(\[[a-zA-Z]{2}\])+/g);
+            let awMatches = problem_node.match(/AW(?:[\s]*\[[a-zA-Z]{2}\])+/g);
             if(awMatches) {
                 awMatches.forEach(m => {
                     let coords = m.match(/\[([a-zA-Z]{2})\]/g);
