@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Atomic Baduk - URL 공유 버전</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            font-family: sans-serif; 
+            background-color: #1a1a1a; 
+            color: white; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        
+        /* PC 및 Dex 화면: 가로 배치 (좌 바둑판, 우 사이드바) */
+        .container { 
+            display: flex; 
+            flex-direction: row; 
+            align-items: center; 
+            justify-content: center; 
+            width: 100%; 
+            max-width: 1200px; 
+            gap: 30px; 
+        }
+        
+        /* 바둑판 영역: 화면 높이에 맞춰 최대화 */
+        #board-container { 
+            position: relative; 
+            aspect-ratio: 1 / 1; 
+            flex: 1 1 auto; 
+            max-width: calc(100vh - 80px); 
+            width: 100%; 
+        }
+        
+        canvas { 
+            width: 100%; 
+            height: 100%; 
+            display: block; 
+            border: 4px solid #333; 
+            background: #D8A45D; 
+            cursor: crosshair; 
+            box-shadow: 0 0 40px rgba(0,0,0,0.8); 
+            border-radius: 12px; 
+        }
+        
+        /* 우측 사이드바(상태창 및 버튼 영역) */
+        .sidebar { 
+            flex: 0 0 320px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+            width: 100%; 
+            background: #2c2c2c; 
+            padding: 20px; 
+            border-radius: 15px; 
+            border: 1px solid #444; 
+        }
+
+        #status { 
+            font-size: 1.2rem; 
+            font-weight: bold; 
+            color: #00e676; 
+            text-align: center; 
+            min-height: 1.5rem; 
+        }
+
+        .bomb-stats { 
+            display: flex; 
+            justify-content: space-around; 
+            font-size: 1.2rem; 
+            font-weight: bold; 
+            background: #1f1f1f; 
+            padding: 12px; 
+            border-radius: 8px; 
+            border: 1px solid #3c3c3c;
+        }
+        .b-text { color: #fff; text-shadow: 0 0 3px #000; } 
+        .w-text { color: #fff; text-shadow: 0 0 3px #000; } 
+
+        .controls-container { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+        }
+        .row-1, .row-2 { 
+            display: flex; 
+            gap: 8px; 
+            width: 100%; 
+            align-items: stretch; 
+            justify-content: space-between; 
+        }
+        
+        button { 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            transition: all 0.2s; 
+            -webkit-tap-highlight-color: transparent; 
+            font-family: inherit; 
+            font-weight: bold; 
+            font-size: 0.95rem; 
+            padding: 12px 4px; 
+        }
+        button:active { transform: scale(0.96); }
+        
+        .row-1 > button { flex: 1; min-width: 0; }
+        .row-2 > button { flex: 1; }
+        
+        .btn-primary { background-color: #4f46e5; color: white; }
+        .btn-info { background-color: #0284c7; color: white; }
+        .btn-bomb { background-color: #ff5252; color: white; }
+        .btn-bomb.active { 
+            background: #ffeb3b; 
+            color: black; 
+            box-shadow: 0 0 20px #ffeb3b; 
+            animation: shake 0.2s infinite; 
+        }
+        .btn-capture { background-color: #be185d; color: white; }
+        
+        .btn-nav { background-color: #4b5563; color: white; font-size: 1.2rem !important; }
+
+        #move-input { 
+            width: 70px; 
+            text-align: center; 
+            font-size: 1.1rem; 
+            font-weight: bold; 
+            background: #1f1f1f; 
+            color: white; 
+            border: 2px solid #444; 
+            border-radius: 8px; 
+            outline: none; 
+        }
+        #move-input:focus { border-color: #4f46e5; }
+
+        @keyframes shake { 
+            0% { transform: translate(1px, 1px); } 
+            50% { transform: translate(-1px, -1px); } 
+            100% { transform: translate(0,0); } 
+        }
+
+        /* 모바일 대응: 세로 배치로 변경, 메뉴가 하단으로 가도록 함 */
+        @media (max-width: 800px) {
+            body { padding: 10px; align-items: flex-start; }
+            .container { 
+                flex-direction: column; 
+                align-items: center; 
+                padding: 0; 
+                gap: 15px; 
+            }
+            #board-container { 
+                max-width: 100vw; 
+                width: 100%; 
+            }
+            .sidebar { 
+                flex: none; 
+                width: 100%; 
+                max-width: 100%; 
+                padding: 15px; 
+            }
+            .row-1 > button { font-size: 0.8rem; padding: 10px 4px; }
+            .btn-nav { font-size: 1rem !important; }
+            #move-input { width: 60px; font-size: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="board-container">
+        <canvas id="board" width="600" height="600"></canvas>
+    </div>
+
+    <div class="sidebar">
+        <div id="status">흑의 차례입니다</div>
+        
+        <div class="bomb-stats">
+            <div class="b-text">흑 폭탄: <span id="bBombs">0</span></div>
+            <div class="w-text">백 폭탄: <span id="wBombs">0</span></div>
+        </div>
+
+        <div class="controls-container">
+            <div class="row-1">
+                <button class="btn-primary" onclick="copyLink()">🔗 링크복사</button>
+                <button class="btn-info" onclick="toggleMoveNumbers()">🔢 수순보기</button>
+                <button id="bombBtn" class="btn-bomb" onclick="toggleBombMode()">💣 폭탄투하</button>
+                <button class="btn-capture" onclick="captureBoard()">📸 캡쳐</button>
+            </div>
+            <div class="row-2">
+                <button class="btn-nav" onclick="goPrevMove()" title="왼쪽 방향키">◀</button>
+                <input type="number" id="move-input" min="0" value="0" onkeydown="handleInputEnter(event)" onblur="jumpToMove()">
+                <button class="btn-nav" onclick="goNextMove()" title="오른쪽 방향키">▶</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const size = 19;
+const chars = 'abcdefghijklmnopqrs';
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const gap = canvas.width / (size + 1);
+const bgColor = '#D8A45D';
+
+// 계산된 게임 현재 상태
+let board = [];
+let moveNumbers = [];
+let turn = 1;
+let bombs = { 1: 0, 2: 0 };
+let bombMode = false;
+
+// 내비게이션 상태 변수
+let currentMoveIndex = 0;
+let showMoveNumbers = false;
+let lastX = -1, lastY = -1;
+let lastMoveType = null;
+let lastPlayedIndex = 0;
+
+// 1. 시뮬레이션 기반 보드 상태 연산 함수 (URL 해시를 해독하여 특정 수순까지의 보드 재구축)
+function computeBoardState(hashString, maxMoves) {
+    let tempBoard = Array.from({length: size}, () => Array(size).fill(0));
+    let tempMoveNumbers = Array.from({length: size}, () => Array(size).fill(0));
+    let tempBombs = { 1: 0, 2: 0 };
+    let tempTurn = 1;
+    let moves = hashString || "";
+    
+    if (maxMoves !== undefined) {
+        moves = moves.substring(0, maxMoves * 2);
+    }
+
+    let lX = -1, lY = -1;
+    let lMoveType = null;
+    let hadCapture = false;
+
+    for (let i = 0; i < moves.length; i += 2) {
+        if (i + 1 >= moves.length) break;
+        let c1 = moves[i];
+        let c2 = moves[i+1];
+        
+        // 대문자 좌표인 경우 폭탄 투하로 판정
+        let isBomb = (c1 === c1.toUpperCase());
+        let x = chars.indexOf(c1.toLowerCase());
+        let y = chars.indexOf(c2.toLowerCase());
+
+        if (x >= 0 && x < size && y >= 0 && y < size) {
+            if (isBomb) {
+                tempBoard[y][x] = -1; // 완전히 소멸된 영역 설정
+                tempMoveNumbers[y][x] = (i / 2) + 1; // 폭탄이 떨어진 수순 번호 기록
+                tempBombs[tempTurn]--;
+                lX = x; lY = y;
+                lMoveType = 'bomb';
+                if (i === moves.length - 2) hadCapture = false;
+                tempTurn = (tempTurn === 1) ? 2 : 1;
+            } else {
+                if (tempBoard[y][x] !== 0) continue; // 중복 방지
+                tempBoard[y][x] = tempTurn;
+                tempMoveNumbers[y][x] = (i / 2) + 1; // 일반 착점 수순 기록
+                
+                let opp = (tempTurn === 1) ? 2 : 1;
+                let caps = processCapturesSimulation(x, y, opp, tempBoard);
+                if (caps > 0) {
+                    tempBombs[tempTurn] += caps;
+                }
+                
+                lX = x; lY = y;
+                lMoveType = 'normal';
+                if (i === moves.length - 2) hadCapture = (caps > 0);
+                tempTurn = (tempTurn === 1) ? 2 : 1;
+            }
+        }
+    }
+
+    return { 
+        board: tempBoard, 
+        moveNumbers: tempMoveNumbers, 
+        bombs: tempBombs, 
+        turn: tempTurn, 
+        moveCount: moves.length / 2, 
+        lastX: lX, 
+        lastY: lY, 
+        lastMoveType: lMoveType,
+        hadCapture
+    };
+}
+
+// 시뮬레이션용 따먹기 연산 함수들
+function processCapturesSimulation(x, y, opp, tempBoard) {
+    let total = 0;
+    const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+    dirs.forEach(([dx, dy]) => {
+        let nx = x + dx, ny = y + dy;
+        if (nx >= 0 && nx < size && ny >= 0 && ny < size && tempBoard[ny][nx] === opp) {
+            if (!hasLibertiesSimulation(nx, ny, new Set(), tempBoard)) {
+                total += removeGroupSimulation(nx, ny, opp, tempBoard);
+            }
+        }
+    });
+    return total;
+}
+
+function hasLibertiesSimulation(x, y, visited, tempBoard) {
+    const color = tempBoard[y][x];
+    visited.add(`${x},${y}`);
+    const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+    for (let [dx, dy] of dirs) {
+        let nx = x + dx, ny = y + dy;
+        if (nx >= 0 && nx < size) {
+            if (tempBoard[ny][nx] === 0) return true;
+            if (tempBoard[ny][nx] === color && !visited.has(`${nx},${ny}`)) {
+                if (hasLibertiesSimulation(nx, ny, visited, tempBoard)) return true;
+            }
+        }
+    }
+    return false;
+}
+
+function removeGroupSimulation(x, y, color, tempBoard) {
+    let count = 1;
+    tempBoard[y][x] = 0;
+    const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+    dirs.forEach(([dx, dy]) => {
+        let nx = x + dx, ny = y + dy;
+        if (nx >= 0 && nx < size && ny >= 0 && ny < size && tempBoard[ny][nx] === color) {
+            count += removeGroupSimulation(nx, ny, color, tempBoard);
+        }
+    });
+    return count;
+}
+
+// 2. 바둑판 및 정보 업데이트 렌더링
+function render() {
+    let hash = window.location.hash.substring(1);
+    let state = computeBoardState(hash, currentMoveIndex);
+    
+    // 상태 변수 동기화
+    board = state.board;
+    moveNumbers = state.moveNumbers;
+    bombs = state.bombs;
+    turn = state.turn;
+    lastX = state.lastX;
+    lastY = state.lastY;
+    lastMoveType = state.lastMoveType;
+
+    // 앞으로 한 수 더 진행되었을 때만 효과음 발생
+    if (currentMoveIndex > lastPlayedIndex) {
+        if (lastMoveType === 'bomb') {
+            playAudio('boom');
+        } else if (state.hadCapture) {
+            playAudio('capture');
+        } else {
+            playAudio('stone');
+        }
+    }
+    lastPlayedIndex = currentMoveIndex;
+
+    draw();
+    updateUI();
+}
+
+function updateUI() {
+    const s = document.getElementById('status');
+    if (bombMode) {
+        s.innerText = "⚠ 폭탄 투하 지점 선택 (착점 영역 완전 소멸)";
+        s.style.color = "#ff5252";
+    } else {
+        s.innerText = (turn === 1 ? "흑" : "백") + "의 차례입니다";
+        s.style.color = "#00e676";
+    }
+    
+    document.getElementById('bBombs').innerText = bombs[1];
+    document.getElementById('wBombs').innerText = bombs[2];
+    
+    const btn = document.getElementById('bombBtn');
+    btn.classList.toggle('active', bombMode);
+    btn.disabled = bombs[turn] <= 0;
+
+    document.getElementById('move-input').value = currentMoveIndex;
+}
+
+function draw() {
+    // 1. 전체 바둑판 배경 칠하기
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 2. 바둑판 선 그리기 (파괴된 지점 -1은 선을 그리지 않음)
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < size; i++) {
+        for (let j = 0; j < size; j++) {
+            if (board[i][j] === -1) continue; 
+            const px = (j + 1) * gap;
+            const py = (i + 1) * gap;
+
+            // 오른쪽 연결 선
+            if (j < size - 1 && board[i][j+1] !== -1) {
+                ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + gap, py); ctx.stroke();
+            }
+            // 아래쪽 연결 선
+            if (i < size - 1 && board[i+1][j] !== -1) {
+                ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px, py + gap); ctx.stroke();
+            }
+        }
+    }
+
+    // 3. 화점 및 천원 표시
+    const dots = [3, 9, 15];
+    ctx.fillStyle = '#333';
+    dots.forEach(r => {
+        dots.forEach(c => {
+            if (board[r][c] !== -1) { 
+                ctx.beginPath();
+                ctx.arc((c + 1) * gap, (r + 1) * gap, 4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        });
+    });
+
+    // 4. 돌 및 소멸 영역 렌더링
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            const px = (c + 1) * gap;
+            const py = (r + 1) * gap;
+            let isLast = (c === lastX && r === lastY);
+
+            if (board[r][c] === -1) {
+                // 폭탄에 의해 소멸된 곳은 완전한 구멍 처리 (배경색으로만 깨끗하게 덮어 씌움)
+                ctx.fillStyle = bgColor;
+                ctx.beginPath();
+                ctx.arc(px, py, gap / 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // [수정] 혼란스러운 빨간 점 마킹은 완전히 지우고, 수순보기가 켜져 있을 때만 "13B" 형태로 깔끔하게 표시
+                if (showMoveNumbers && moveNumbers[r][c] > 0) {
+                    ctx.fillStyle = '#ff1744'; // 폭탄 수순 구분을 위한 밝은 빨간색 텍스트
+                    ctx.font = 'bold 11px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(moveNumbers[r][c] + 'B', px, py);
+                }
+            } else if (board[r][c] > 0) {
+                // 바둑돌 입체 렌더링
+                ctx.beginPath();
+                ctx.arc(px, py, gap / 2.2, 0, Math.PI * 2);
+                const grad = ctx.createRadialGradient(px - 5, py - 5, 2, px, py, gap / 2);
+                if (board[r][c] === 1) { // 흑돌
+                    grad.addColorStop(0, '#555'); grad.addColorStop(1, '#000');
+                } else { // 백돌
+                    grad.addColorStop(0, '#fff'); grad.addColorStop(1, '#ccc');
+                }
+                ctx.fillStyle = grad;
+                ctx.fill();
+                if (board[r][c] === 2) { 
+                    ctx.strokeStyle = '#000'; ctx.lineWidth = 0.5; ctx.stroke(); 
+                }
+
+                // 수순보기 활성화 시 숫자 표기, 비활성화 시 마지막 일반 착점 마킹
+                if (showMoveNumbers && moveNumbers[r][c] > 0) {
+                    ctx.fillStyle = (board[r][c] === 1) ? '#fff' : '#000';
+                    ctx.font = 'bold 11px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(moveNumbers[r][c], px, py);
+                } else if (isLast) {
+                    ctx.fillStyle = (board[r][c] === 1) ? '#fff' : '#000';
+                    ctx.beginPath();
+                    ctx.arc(px, py, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+    }
+}
+
+// 3. 마우스 클릭 및 좌표 제어
+canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    
+    // 화면 크기 변화에 대응한 좌표 정밀 보정
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clickX = (e.clientX - rect.left) * scaleX;
+    const clickY = (e.clientY - rect.top) * scaleY;
+
+    const x = Math.round(clickX / gap - 1);
+    const y = Math.round(clickY / gap - 1);
+
+    if (x < 0 || x >= size || y < 0 || y >= size || board[y][x] === -1) return;
+
+    let hash = window.location.hash.substring(1);
+    let currentMoves = hash.substring(0, currentMoveIndex * 2);
+
+    if (bombMode) {
+        if (bombs[turn] <= 0) return;
+        // 폭탄 투하는 대문자 좌표로 해시에 기록
+        let nextMove = chars[x].toUpperCase() + chars[y].toUpperCase();
+        bombMode = false;
+        window.location.hash = currentMoves + nextMove;
+    } else {
+        if (board[y][x] !== 0) return;
+        
+        // 자살수 방지 미리 시뮬레이션 검사
+        let tempBoard = board.map(row => [...row]);
+        tempBoard[y][x] = turn;
+        let opp = (turn === 1) ? 2 : 1;
+        let caps = processCapturesSimulation(x, y, opp, tempBoard);
+        if (caps === 0 && !hasLibertiesSimulation(x, y, new Set(), tempBoard)) {
+            return; // 자살수 방지 작동
+        }
+
+        // 일반 착점은 소문자 좌표로 기록
+        let nextMove = chars[x] + chars[y];
+        window.location.hash = currentMoves + nextMove;
+    }
+});
+
+// 4. 해시값 변경 추적 및 렌더링 제어
+window.addEventListener('hashchange', () => {
+    let hash = window.location.hash.substring(1);
+    currentMoveIndex = hash.length / 2;
+    render();
+});
+
+// 5. 컨트롤 메뉴 주요 기능 구현
+function toggleMoveNumbers() { 
+    showMoveNumbers = !showMoveNumbers; 
+    draw(); 
+}
+
+function toggleBombMode() { 
+    if (bombs[turn] > 0) { 
+        bombMode = !bombMode; 
+        updateUI(); 
+    } else {
+        alert("현재 플레이어에게 폭탄이 없습니다!");
+    }
+}
+
+function goPrevMove() { 
+    if (currentMoveIndex > 0) { 
+        currentMoveIndex--; 
+        render(); 
+    } 
+}
+
+function goNextMove() {
+    let hash = window.location.hash.substring(1);
+    let maxMoves = hash.length / 2;
+    if (currentMoveIndex < maxMoves) { 
+        currentMoveIndex++; 
+        render(); 
+    }
+}
+
+function handleInputEnter(e) { 
+    if (e.key === 'Enter') document.getElementById('move-input').blur(); 
+}
+
+function jumpToMove() {
+    let targetMove = parseInt(document.getElementById('move-input').value);
+    let hash = window.location.hash.substring(1);
+    let maxMoves = hash.length / 2;
+    if (isNaN(targetMove) || targetMove < 0) targetMove = 0;
+    if (targetMove > maxMoves) targetMove = maxMoves;
+    currentMoveIndex = targetMove; 
+    render();
+}
+
+function copyLink() {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+        alert("🔗 링크가 복사되었습니다! 댓글이나 문자로 공유해보세요.");
+    });
+}
+
+function captureBoard() {
+    const tempLink = document.createElement('a');
+    tempLink.download = `atomic_baduk_${new Date().toISOString().slice(0,10).replace(/-/g, "")}.png`;
+    tempLink.href = canvas.toDataURL('image/png');
+    document.body.appendChild(tempLink); 
+    tempLink.click(); 
+    document.body.removeChild(tempLink);
+}
+
+// 6. 사운드 효과 (Web Audio API 활용)
+function playAudio(type) {
+    try {
+        const aCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = aCtx.createOscillator();
+        const g = aCtx.createGain();
+        osc.connect(g); g.connect(aCtx.destination);
+        if (type === 'boom') {
+            osc.type = 'sawtooth'; 
+            osc.frequency.setValueAtTime(120, aCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(0.01, aCtx.currentTime + 0.6);
+            g.gain.setValueAtTime(0.2, aCtx.currentTime);
+            osc.start(); osc.stop(aCtx.currentTime + 0.6);
+        } else if (type === 'capture') {
+            osc.type = 'sine'; 
+            osc.frequency.setValueAtTime(900, aCtx.currentTime);
+            g.gain.setValueAtTime(0.1, aCtx.currentTime);
+            osc.start(); osc.stop(aCtx.currentTime + 0.3);
+        } else if (type === 'stone') {
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, aCtx.currentTime);
+            g.gain.setValueAtTime(0.15, aCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.01, aCtx.currentTime + 0.1);
+            osc.start(); osc.stop(aCtx.currentTime + 0.1);
+        }
+    } catch(e){}
+}
+
+// 키보드 방향키로 수순 탐색 지원
+document.addEventListener('keydown', (e) => {
+    if (document.activeElement.tagName === 'INPUT') return;
+    if (e.key === 'ArrowLeft') goPrevMove();
+    if (e.key === 'ArrowRight') goNextMove();
+});
+
+// 초기 구동
+const initialHash = window.location.hash.substring(1);
+currentMoveIndex = initialHash.length / 2;
+render();
+</script>
+</body>
+</html>
