@@ -28,7 +28,8 @@
             align-items: flex-start; 
             justify-content: center; 
             width: 100%; 
-            max-width: 1100px; 
+            /* 기존 1100px 제한을 없애고 화면 가로 폭을 최대한 활용합니다 */
+            max-width: 100%; 
             gap: 30px;
         }
         
@@ -43,6 +44,7 @@
             -webkit-user-select: none; 
             user-select: none;
             flex: 1 1 auto; 
+            /* 화면의 상하 여백(80px)을 제외한 모든 높이를 바둑판 크기에 할당합니다 */
             max-height: calc(100vh - 80px);
             max-width: calc(100vh - 80px);
             width: 100%;
@@ -244,24 +246,21 @@
                 moveCount++;
                 
                 if (isBomb) {
-                    // 1. 돌 위에 폭탄이 직접 떨어진 경우 해당 돌 파괴 및 폭탄 획득
                     let existingStone = board[y][x];
                     if (existingStone === 1) wBombs++; 
                     else if (existingStone === 2) bBombs++;
 
-                    board[y][x] = -1; // 교차점 파괴
+                    board[y][x] = -1; 
                     if (turn === 1) bBombs--; else wBombs--;
                     moveHistory.push({ x, y, type: 'bomb', moveNum: moveCount, color: turn });
                     lastX = x; lastY = y;
 
-                    // 2. 폭탄 투하로 인해 상대방 돌의 활로가 막혀 죽는 경우 포획 처리
                     let oppColor = turn === 1 ? 2 : 1;
                     let capturedOpp = processCapturesLocal(x, y, oppColor);
                     if (capturedOpp > 0) {
                         if (turn === 1) bBombs += capturedOpp; else wBombs += capturedOpp;
                     }
 
-                    // 3. 폭탄 투하로 인해 본인 돌의 활로가 막혀 죽는 경우 (상대방에게 폭탄 제공)
                     let capturedSelf = processCapturesLocal(x, y, turn);
                     if (capturedSelf > 0) {
                         if (turn === 1) wBombs += capturedSelf; else bBombs += capturedSelf;
@@ -278,12 +277,11 @@
                     if (captured > 0) {
                         if (turn === 1) bBombs += captured; else wBombs += captured;
                     } else {
-                        // 자살수 방지: 활로가 없는데 포획도 못했다면 착수 무효화
                         if (!hasLibertiesLocal(x, y, turn, new Set())) {
                             board[y][x] = 0; 
                             moveHistory.pop();
                             moveCount--;
-                            continue; // 턴 안넘기고 스킵 (URL 무효 수순)
+                            continue; 
                         }
                     }
                 }
@@ -385,7 +383,6 @@
             let cell = state.board[gridY][gridX];
 
             if (bombMode) {
-                // 파괴된 곳(-1)엔 다시 폭탄 투하 불가. (일반 돌 위에는 투하 가능)
                 if (cell === -1) return; 
 
                 let hasBomb = (state.turn === 1 && state.bBombs > 0) || (state.turn === 2 && state.wBombs > 0);
@@ -398,7 +395,6 @@
                 bombMode = false; 
                 document.getElementById('btn-bomb').classList.remove('active');
             } else {
-                // 일반 착수는 빈 곳(0)에만 가능
                 if (cell !== 0) return;
                 
                 let nextMove = chars[gridX] + chars[gridY];
