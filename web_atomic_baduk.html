@@ -28,7 +28,6 @@
             align-items: flex-start; 
             justify-content: center; 
             width: 100%; 
-            /* 기존 1100px 제한을 없애고 화면 가로 폭을 최대한 활용합니다 */
             max-width: 100%; 
             gap: 30px;
         }
@@ -44,7 +43,6 @@
             -webkit-user-select: none; 
             user-select: none;
             flex: 1 1 auto; 
-            /* 화면의 상하 여백(80px)을 제외한 모든 높이를 바둑판 크기에 할당합니다 */
             max-height: calc(100vh - 80px);
             max-width: calc(100vh - 80px);
             width: 100%;
@@ -246,10 +244,7 @@
                 moveCount++;
                 
                 if (isBomb) {
-                    let existingStone = board[y][x];
-                    if (existingStone === 1) wBombs++; 
-                    else if (existingStone === 2) bBombs++;
-
+                    // 폭탄으로 직접 파괴된 돌을 사석으로 계산하여 폭탄을 환불해주는 로직 제거됨.
                     board[y][x] = -1; 
                     if (turn === 1) bBombs--; else wBombs--;
                     moveHistory.push({ x, y, type: 'bomb', moveNum: moveCount, color: turn });
