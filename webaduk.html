@@ -35,22 +35,31 @@
         .turn-W { background: white; border: 1px solid #ccc; }
 
         .controls-container { display: flex; flex-direction: column; gap: 10px; }
-        .row-1, .row-2 { display: flex; gap: 8px; width: 100%; align-items: stretch; justify-content: space-between; }
+        .row-1, .row-2, .row-3 { display: flex; gap: 8px; width: 100%; align-items: stretch; justify-content: space-between; }
         
         button { border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s; -webkit-tap-highlight-color: transparent; font-family: inherit; }
         button:active { transform: scale(0.96); }
         
-        .row-1 > button, .row-2 > button { flex: 1; padding: 12px 4px; font-size: 13px; font-weight: bold; white-space: nowrap; letter-spacing: -0.5px; }
+        .row-1 > button, .row-2 > button, .row-3 > button { flex: 1; padding: 12px 4px; font-size: 13px; font-weight: bold; white-space: nowrap; letter-spacing: -0.5px; }
         
         .btn-primary { background-color: #4f46e5; color: white; }
         .btn-download { background-color: #059669; color: white; }
         .btn-upload { background-color: #d97706; color: white; } 
+        .btn-upload-folder { background-color: #ea580c; color: white; } 
         .btn-info { background-color: #0284c7; color: white; }
         
         .btn-nav { background-color: #4b5563; color: white; flex: 0.8 !important; font-size: 16px !important; }
         .btn-review { background-color: #9333ea; color: white; flex: 1.5 !important; }
         .btn-capture { background-color: #be185d; color: white; flex: 1.5 !important; }
         .btn-review.active { background-color: #dc2626; animation: pulse 1.5s infinite; }
+
+        .btn-folder-nav { background-color: #1f2937; color: white; font-size: 13px !important; flex: 1 !important; }
+        
+        .row-3 { display: none; } /* 폴더 로드 전에 숨김 */
+        .problem-counter-box { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 14px; font-weight: bold; align-self: center; background: #f9fafb; padding: 6px 4px; border-radius: 6px; border: 1px solid #e5e7eb; color: #333; }
+        #problem-number-input { width: 58px; min-width: 0; padding: 4px 2px; text-align: center; font-size: 14px; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 5px; outline: none; background: white; color: #333; }
+        #problem-number-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,0.12); }
+        #problem-total { min-width: 20px; text-align: left; }
 
         #move-input { width: 55px; flex-shrink: 0; text-align: center; font-size: 15px; font-weight: bold; border: 2px solid #ccc; border-radius: 6px; outline: none; }
         #move-input:focus { border-color: #4f46e5; }
@@ -67,7 +76,10 @@
             .container { flex-direction: column; align-items: center; padding: 10px; border-radius: 0; box-shadow: none; gap: 15px; }
             #board-container { border-left: none; border-right: none; border-radius: 0; max-width: 100vw; flex: none; }
             .sidebar { flex: none; max-width: max(300px, calc(100vh - 220px)); }
-            .row-1 > button, .row-2 > button { font-size: 11px; padding: 10px 2px; }
+            .row-1 > button, .row-2 > button, .row-3 > button { font-size: 11px; padding: 10px 2px; }
+            .problem-counter-box { padding: 6px 2px; font-size: 12px; gap: 2px; }
+            #problem-number-input { width: 46px; font-size: 12px; padding: 3px 1px; }
+            #problem-total { min-width: 16px; }
             #move-input { width: 45px; font-size: 13px; }
         }
     </style>
@@ -86,12 +98,15 @@
         </div>
 
         <input type="file" id="sgf-file-input" accept=".sgf" style="display: none;" onchange="loadSGFFile(event)">
+        <!-- 폴더 업로드용 인풋 추가 -->
+        <input type="file" id="sgf-folder-input" webkitdirectory directory multiple style="display: none;" onchange="loadSGFFolder(event)">
 
         <div class="controls-container">
             <div class="row-1">
                 <button class="btn-primary" onclick="copyLink()">🔗 링크복사</button>
                 <button class="btn-download" onclick="downloadSGF()">💾 SGF저장</button>
-                <button class="btn-upload" onclick="document.getElementById('sgf-file-input').click()">📂 SGF열기</button>
+                <button class="btn-upload" onclick="document.getElementById('sgf-file-input').click()">📂 파일열기</button>
+                <button class="btn-upload-folder" onclick="document.getElementById('sgf-folder-input').click()">📁 폴더열기</button>
                 <button class="btn-info" onclick="toggleMoveNumbers()">🔢 수순보기</button>
             </div>
             <div class="row-2">
@@ -100,6 +115,16 @@
                 <button class="btn-nav" onclick="goNextMove()" title="오른쪽 방향키">▶</button>
                 <button id="btn-review" class="btn-review" onclick="toggleReviewMode()">🔍 검토</button>
                 <button class="btn-capture" onclick="captureBoard()">📸 캡쳐</button>
+            </div>
+            <!-- 폴더 내 문제 이동 네비게이션 -->
+            <div class="row-3" id="problem-nav">
+                <button class="btn-folder-nav" onclick="prevProblem()">⏮ 이전문제</button>
+                <div class="problem-counter-box" id="problem-counter" title="문제 번호를 클릭해서 직접 입력할 수 있습니다.">
+                    <input type="number" id="problem-number-input" min="1" value="1" onkeydown="handleProblemInputEnter(event)" onblur="jumpToProblem()">
+                    <span>/</span>
+                    <span id="problem-total">0</span>
+                </div>
+                <button class="btn-folder-nav" onclick="nextProblem()">다음문제 ⏭</button>
             </div>
         </div>
     </div>
@@ -115,6 +140,15 @@
     let showMoveNumbers = false;    
     let isReviewMode = false;       
     let savedReviewState = null;    
+
+    // 폴더 내 문제 관리 변수
+    // 폴더를 열면 모든 문제의 변환된 데이터를 URL 하나에 저장합니다.
+    // 현재 문제 번호는 URL에 저장하지 않으므로 문제를 바꿔도 URL은 그대로 유지됩니다.
+    const FOLDER_URL_PREFIX = 'FOLDER1:';
+    let folderProblems = [];
+    let currentFileIndex = -1;
+    let isFolderMode = false;
+    let currentFolderHash = '';
 
     function initBoardLayout() {
         let html = '';
@@ -236,7 +270,7 @@
     }
 
     function render() {
-        let hash = window.location.hash.substring(1);
+        let hash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
         let { board, moveCount, lastX, lastY } = computeBoardState(hash, currentMoveIndex);
         let stonesGroup = document.getElementById('stones');
         let html = '';
@@ -281,7 +315,13 @@
         let gridY = Math.round(((mouseY / rect.height) * 400 - pad) / step);
 
         if (gridX >= 0 && gridX < size && gridY >= 0 && gridY < size) {
-            let currentHash = window.location.hash.substring(1);
+            // 폴더 모드에서는 반드시 [검토] 상태에서만 착점을 허용합니다.
+            // 검토 중이 아니면 문제 원본 데이터가 실수로 변경되지 않도록 즉시 종료합니다.
+            if (isFolderMode && !isReviewMode) {
+                return;
+            }
+
+            let currentHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
             
             let { board } = computeBoardState(currentHash, currentMoveIndex);
             if (board[gridY][gridX] !== null) {
@@ -302,19 +342,39 @@
             } else {
                 newHash = newMoves;
             }
-            window.location.hash = newHash; 
+            if (isFolderMode) {
+                // 폴더 모드에서는 검토 중일 때만 착점합니다.
+                // URL의 폴더 전체 데이터와 원본 문제 데이터는 그대로 두고,
+                // 현재 검토용 상태(currentFolderHash)만 변경합니다.
+                currentFolderHash = newHash;
+                currentMoveIndex = newMoves.length / 2;
+                render();
+            } else {
+                window.location.hash = newHash;
+            }
         }
     });
 
     window.addEventListener('hashchange', () => {
+        if (loadFolderFromUrl()) {
+            render();
+            return;
+        }
+
+        isFolderMode = false;
+        folderProblems = [];
+        currentFileIndex = -1;
+        currentFolderHash = '';
+        document.getElementById('problem-nav').style.display = 'none';
+
         let currentHash = window.location.hash.substring(1);
         let { moves } = parseHashData(currentHash);
-        
+
         if (window.isSgfFileLoading) {
             if (window.loadedSgfIsProblem) {
-                currentMoveIndex = 0; 
+                currentMoveIndex = 0;
             } else {
-                currentMoveIndex = moves.length / 2; 
+                currentMoveIndex = moves.length / 2;
             }
             window.isSgfFileLoading = false;
         } else {
@@ -326,13 +386,15 @@
     function toggleMoveNumbers() { showMoveNumbers = !showMoveNumbers; render(); }
     function goPrevMove() { if (currentMoveIndex > 0) { currentMoveIndex--; render(); } }
     function goNextMove() {
-        let { moves } = parseHashData(window.location.hash.substring(1));
+        let activeHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
+        let { moves } = parseHashData(activeHash);
         if (currentMoveIndex < moves.length / 2) { currentMoveIndex++; render(); }
     }
     function handleInputEnter(e) { if (e.key === 'Enter') document.getElementById('move-input').blur(); }
     function jumpToMove() {
         let targetMove = parseInt(document.getElementById('move-input').value);
-        let { moves } = parseHashData(window.location.hash.substring(1));
+        let activeHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
+        let { moves } = parseHashData(activeHash);
         let maxMoves = moves.length / 2;
         if (isNaN(targetMove) || targetMove < 0) targetMove = 0;
         if (targetMove > maxMoves) targetMove = maxMoves;
@@ -342,26 +404,50 @@
     function toggleReviewMode() {
         let btn = document.getElementById('btn-review');
         isReviewMode = !isReviewMode;
-        
+
         if (isReviewMode) {
-            savedReviewState = { hash: window.location.hash, index: currentMoveIndex };
+            savedReviewState = {
+                hash: isFolderMode ? currentFolderHash : window.location.hash,
+                index: currentMoveIndex,
+                folderProblemHash: isFolderMode && folderProblems[currentFileIndex]
+                    ? folderProblems[currentFileIndex].hash
+                    : null
+            };
             btn.classList.add('active');
             btn.innerText = '🛑 검토 종료';
-            let { setupB, setupW, moves } = parseHashData(window.location.hash.substring(1));
+
+            let { setupB, setupW, moves } = parseHashData(isFolderMode ? currentFolderHash : window.location.hash.substring(1));
             moves = moves.substring(0, currentMoveIndex * 2);
             let newHash = "";
             if(setupB) newHash += "B" + setupB;
             if(setupW) newHash += "W" + setupW;
             if(setupB || setupW) newHash += "_" + moves; else newHash = moves;
-            window.location.hash = newHash; 
+
+            if (isFolderMode) {
+                currentFolderHash = newHash;
+                // URL은 폴더 전체 데이터를 유지해야 하므로 변경하지 않습니다.
+                // 검토 시작 지점은 현재 수순 수와 일치하도록 유지합니다.
+                currentMoveIndex = moves.length / 2;
+                render();
+            } else {
+                window.location.hash = newHash;
+            }
         } else {
-            window.location.hash = savedReviewState.hash || '';
-            currentMoveIndex = savedReviewState.index;
+            if (isFolderMode) {
+                currentFolderHash = savedReviewState.hash;
+                currentMoveIndex = savedReviewState.index;
+                if (folderProblems[currentFileIndex] && savedReviewState.folderProblemHash !== null) {
+                    folderProblems[currentFileIndex].hash = savedReviewState.folderProblemHash;
+                }
+                render();
+            } else {
+                window.location.hash = savedReviewState.hash || '';
+                currentMoveIndex = savedReviewState.index;
+            }
             savedReviewState = null;
             btn.classList.remove('active');
             btn.innerText = '🔍 검토';
         }
-        render();
     }
 
     document.addEventListener('keydown', (e) => {
@@ -397,179 +483,366 @@
         img.src = url;
     }
 
+    // 공통 SGF 데이터 처리 로직 추출
+    function processSgfContent(content, applyToUrl = true) {
+        let problem_node = content;
+        let remainder = "";
+        let nodeStart = content.indexOf('(;');
+        if (nodeStart !== -1) {
+            let insideBracket = false, escapeNext = false;
+            for(let i = nodeStart + 2; i < content.length; i++) {
+                let char = content[i];
+                if(escapeNext) { escapeNext = false; continue; }
+                if(char === '\\') { escapeNext = true; continue; }
+                if(char === '[') insideBracket = true;
+                else if(char === ']') insideBracket = false;
+                else if(!insideBracket) {
+                    if(char === ';' || char === '(') {
+                        problem_node = content.substring(0, i).trim();
+                        if(!problem_node.endsWith(')')) problem_node += ')';
+                        remainder = content.substring(i);
+                        if(remainder.startsWith(';')) remainder = '(' + remainder;
+                        break;
+                    } else if (char === ')') {
+                        problem_node = content.substring(0, i+1);
+                        break;
+                    }
+                }
+            }
+        }
+
+        let isProblem = problem_node.includes('AB[') || problem_node.includes('AW[');
+        let flipX = false, flipY = false, isWhiteFirst = false;
+
+        if (isProblem) {
+            let allCoords = [];
+            let coordRegex = /(AB|AW|AE|B|W|TB|TW|TR|SQ|CR|MA)((?:[\s]*\[[a-zA-Z]{2}\])+)/g;
+            let match;
+            while((match = coordRegex.exec(content)) !== null) {
+                let coords = match[2].match(/\[([a-zA-Z]{2})\]/g);
+                if(coords) {
+                    coords.forEach(c => {
+                        let x = c.charCodeAt(1) - 97, y = c.charCodeAt(2) - 97;
+                        if(x >= 0 && x < 19 && y >= 0 && y < 19) allCoords.push({x, y});
+                    });
+                }
+            }
+            if(allCoords.length > 0) {
+                let avgX = allCoords.reduce((sum, c) => sum + c.x, 0) / allCoords.length;
+                let avgY = allCoords.reduce((sum, c) => sum + c.y, 0) / allCoords.length;
+                flipX = avgX > 9;
+                flipY = avgY < 9;
+            }
+            let firstMoveMatch = remainder.match(/;([BW])\[/i);
+            if (firstMoveMatch && firstMoveMatch[1].toUpperCase() === 'W') {
+                isWhiteFirst = true;
+            }
+        }
+
+        function transformStr(str) {
+            let x = str.charCodeAt(0) - 97, y = str.charCodeAt(1) - 97;
+            let nx = flipX ? 18 - x : x;
+            let ny = flipY ? 18 - y : y;
+            return String.fromCharCode(nx + 97) + String.fromCharCode(ny + 97);
+        }
+
+        let setupB_arr = [], setupW_arr = [];
+        let abMatches = problem_node.match(/AB(?:[\s]*\[[a-zA-Z]{2}\])+/g);
+        if(abMatches) {
+            abMatches.forEach(m => {
+                let coords = m.match(/\[([a-zA-Z]{2})\]/g);
+                if(coords) coords.forEach(c => setupB_arr.push(c.slice(1,3).toLowerCase()));
+            });
+        }
+        let awMatches = problem_node.match(/AW(?:[\s]*\[[a-zA-Z]{2}\])+/g);
+        if(awMatches) {
+            awMatches.forEach(m => {
+                let coords = m.match(/\[([a-zA-Z]{2})\]/g);
+                if(coords) coords.forEach(c => setupW_arr.push(c.slice(1,3).toLowerCase()));
+            });
+        }
+
+        let finalSetupB = isWhiteFirst ? setupW_arr : setupB_arr;
+        let finalSetupW = isWhiteFirst ? setupB_arr : setupW_arr;
+        
+        let setupB_str = finalSetupB.map(transformStr).join('');
+        let setupW_str = finalSetupW.map(transformStr).join('');
+
+        let allPaths = [], currentPath = [], stack = [], lastOp = null, i = 0;
+        while (i < remainder.length) {
+            let c = remainder[i];
+            if (c === '(') {
+                stack.push([...currentPath]); lastOp = '('; i++;
+            } else if (c === ')') {
+                if (lastOp === 'node' && currentPath.length > 0) allPaths.push([...currentPath]);
+                if (stack.length > 0) currentPath = stack.pop();
+                lastOp = ')'; i++;
+            } else if (c === ';') {
+                let start = i; i++;
+                let inBracket = false, escape = false;
+                while (i < remainder.length) {
+                    let ch = remainder[i];
+                    if (escape) escape = false;
+                    else if (ch === '\\') escape = true;
+                    else if (ch === '[') inBracket = true;
+                    else if (ch === ']') inBracket = false;
+                    else if (!inBracket && (ch === ';' || ch === '(' || ch === ')')) break;
+                    i++;
+                }
+                currentPath.push(remainder.substring(start, i)); lastOp = 'node';
+            } else {
+                i++;
+            }
+        }
+        if (lastOp === 'node' && currentPath.length > 0) allPaths.push([...currentPath]);
+
+        let correctPaths = allPaths.filter(path => {
+            if(path.length === 0) return false;
+            let lastNode = path[path.length - 1];
+            if(/C\[.*?correct.*?\]/i.test(lastNode) || lastNode.includes('CR[')) return true;
+            if(!/[BW]\[[a-zA-Z]{2}\]/.test(lastNode) && path.length > 1) {
+                let prevNode = path[path.length - 2];
+                if(/C\[.*?correct.*?\]/i.test(prevNode) || prevNode.includes('CR[')) return true;
+            }
+            return false;
+        });
+
+        let targetPaths = correctPaths.length > 0 ? correctPaths : allPaths;
+        let bestPath = targetPaths.length > 0 ? targetPaths[0] : [];
+
+        let movesHash = "";
+        bestPath.forEach(node => {
+            let moveMatch = [...node.matchAll(/[BW]\[([a-zA-Z]{2})\]/gi)];
+            moveMatch.forEach(m => {
+                movesHash += transformStr(m[1].toLowerCase());
+            });
+        });
+
+        let hasSetup = (setupB_str.length > 0 || setupW_str.length > 0);
+        let newHash = "";
+        if (hasSetup) {
+            if (setupB_str) newHash += "B" + setupB_str;
+            if (setupW_str) newHash += "W" + setupW_str;
+            newHash += "_" + movesHash;
+        } else {
+            newHash = movesHash;
+        }
+
+        if (applyToUrl) {
+            isFolderMode = false;
+            window.isSgfFileLoading = true;
+            window.loadedSgfIsProblem = isProblem;
+            window.location.hash = newHash;
+        }
+
+        return { hash: newHash, isProblem };
+    }
+
+    // UTF-8 문자열을 URL-safe Base64로 변환
+    function encodeFolderPayload(data) {
+        const bytes = new TextEncoder().encode(JSON.stringify(data));
+        let binary = '';
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        }
+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+
+    // URL-safe Base64를 UTF-8 문자열로 복원
+    function decodeFolderPayload(encoded) {
+        const base64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = base64 + '='.repeat((4 - base64.length % 4) % 4);
+        const binary = atob(padded);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return JSON.parse(new TextDecoder().decode(bytes));
+    }
+
+    function getFolderUrlHash() {
+        const payload = {
+            version: 1,
+            files: folderProblems.map(problem => ({
+                name: problem.name,
+                hash: problem.hash,
+                isProblem: !!problem.isProblem
+            }))
+        };
+        return FOLDER_URL_PREFIX + encodeFolderPayload(payload);
+    }
+
+    function updateProblemCounter() {
+        document.getElementById('problem-number-input').value = folderProblems.length > 0 ? currentFileIndex + 1 : 0;
+        document.getElementById('problem-total').innerText = folderProblems.length;
+    }
+
+    // 단일 파일 불러오기
     function loadSGFFile(event) {
         const file = event.target.files[0];
         if (!file) return;
+
+        isFolderMode = false;
+        folderProblems = [];
+        currentFileIndex = -1;
+        currentFolderHash = '';
+        document.getElementById('problem-nav').style.display = 'none';
+
         const reader = new FileReader();
         reader.onload = function(e) {
-            let content = e.target.result;
-            
-            // 1. 문제 영역 분리
-            let problem_node = content;
-            let remainder = "";
-            let nodeStart = content.indexOf('(;');
-            if (nodeStart !== -1) {
-                let insideBracket = false, escapeNext = false;
-                for(let i = nodeStart + 2; i < content.length; i++) {
-                    let char = content[i];
-                    if(escapeNext) { escapeNext = false; continue; }
-                    if(char === '\\') { escapeNext = true; continue; }
-                    if(char === '[') insideBracket = true;
-                    else if(char === ']') insideBracket = false;
-                    else if(!insideBracket) {
-                        if(char === ';' || char === '(') {
-                            problem_node = content.substring(0, i).trim();
-                            if(!problem_node.endsWith(')')) problem_node += ')';
-                            remainder = content.substring(i);
-                            if(remainder.startsWith(';')) remainder = '(' + remainder;
-                            break;
-                        } else if (char === ')') {
-                            problem_node = content.substring(0, i+1);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // 문제인지 판별 (세팅돌 여부)
-            let isProblem = problem_node.includes('AB[') || problem_node.includes('AW[');
-            let flipX = false, flipY = false, isWhiteFirst = false;
-
-            if (isProblem) {
-                // 평균 좌표(중심점) 확인 -> 좌하귀 회전 여부 판단 (줄바꿈 대응 정규식 수정)
-                let allCoords = [];
-                let coordRegex = /(AB|AW|AE|B|W|TB|TW|TR|SQ|CR|MA)((?:[\s]*\[[a-zA-Z]{2}\])+)/g;
-                let match;
-                while((match = coordRegex.exec(content)) !== null) {
-                    let coords = match[2].match(/\[([a-zA-Z]{2})\]/g);
-                    if(coords) {
-                        coords.forEach(c => {
-                            let x = c.charCodeAt(1) - 97, y = c.charCodeAt(2) - 97;
-                            if(x >= 0 && x < 19 && y >= 0 && y < 19) allCoords.push({x, y});
-                        });
-                    }
-                }
-                if(allCoords.length > 0) {
-                    let avgX = allCoords.reduce((sum, c) => sum + c.x, 0) / allCoords.length;
-                    let avgY = allCoords.reduce((sum, c) => sum + c.y, 0) / allCoords.length;
-                    flipX = avgX > 9;
-                    flipY = avgY < 9;
-                }
-
-                // 백이 먼저 두는 문제인지 확인
-                let firstMoveMatch = remainder.match(/;([BW])\[/i);
-                if (firstMoveMatch && firstMoveMatch[1].toUpperCase() === 'W') {
-                    isWhiteFirst = true;
-                }
-            }
-
-            // 변환 유틸리티
-            function transformStr(str) {
-                let x = str.charCodeAt(0) - 97, y = str.charCodeAt(1) - 97;
-                let nx = flipX ? 18 - x : x;
-                let ny = flipY ? 18 - y : y;
-                return String.fromCharCode(nx + 97) + String.fromCharCode(ny + 97);
-            }
-
-            // 2. 세팅 돌 (AB, AW) 추출 및 변환 (줄바꿈 대응 정규식 수정)
-            let setupB_arr = [], setupW_arr = [];
-            let abMatches = problem_node.match(/AB(?:[\s]*\[[a-zA-Z]{2}\])+/g);
-            if(abMatches) {
-                abMatches.forEach(m => {
-                    let coords = m.match(/\[([a-zA-Z]{2})\]/g);
-                    if(coords) coords.forEach(c => setupB_arr.push(c.slice(1,3).toLowerCase()));
-                });
-            }
-            let awMatches = problem_node.match(/AW(?:[\s]*\[[a-zA-Z]{2}\])+/g);
-            if(awMatches) {
-                awMatches.forEach(m => {
-                    let coords = m.match(/\[([a-zA-Z]{2})\]/g);
-                    if(coords) coords.forEach(c => setupW_arr.push(c.slice(1,3).toLowerCase()));
-                });
-            }
-
-            // 흑백 반전
-            let finalSetupB = isWhiteFirst ? setupW_arr : setupB_arr;
-            let finalSetupW = isWhiteFirst ? setupB_arr : setupW_arr;
-            
-            let setupB_str = finalSetupB.map(transformStr).join('');
-            let setupW_str = finalSetupW.map(transformStr).join('');
-
-            // 3. 정답 수순(경로) 찾기
-            let allPaths = [], currentPath = [], stack = [], lastOp = null, i = 0;
-            while (i < remainder.length) {
-                let c = remainder[i];
-                if (c === '(') {
-                    stack.push([...currentPath]); lastOp = '('; i++;
-                } else if (c === ')') {
-                    if (lastOp === 'node' && currentPath.length > 0) allPaths.push([...currentPath]);
-                    if (stack.length > 0) currentPath = stack.pop();
-                    lastOp = ')'; i++;
-                } else if (c === ';') {
-                    let start = i; i++;
-                    let inBracket = false, escape = false;
-                    while (i < remainder.length) {
-                        let ch = remainder[i];
-                        if (escape) escape = false;
-                        else if (ch === '\\') escape = true;
-                        else if (ch === '[') inBracket = true;
-                        else if (ch === ']') inBracket = false;
-                        else if (!inBracket && (ch === ';' || ch === '(' || ch === ')')) break;
-                        i++;
-                    }
-                    currentPath.push(remainder.substring(start, i)); lastOp = 'node';
-                } else {
-                    i++;
-                }
-            }
-            if (lastOp === 'node' && currentPath.length > 0) allPaths.push([...currentPath]);
-
-            // correct 태그 혹은 동그라미(CR)를 포함하는 경로 찾기
-            let correctPaths = allPaths.filter(path => {
-                if(path.length === 0) return false;
-                let lastNode = path[path.length - 1];
-                if(/C\[.*?correct.*?\]/i.test(lastNode) || lastNode.includes('CR[')) return true;
-                if(!/[BW]\[[a-zA-Z]{2}\]/.test(lastNode) && path.length > 1) {
-                    let prevNode = path[path.length - 2];
-                    if(/C\[.*?correct.*?\]/i.test(prevNode) || prevNode.includes('CR[')) return true;
-                }
-                return false;
-            });
-
-            // 정답 경로가 없으면 기본 메인 갈래길 사용
-            let targetPaths = correctPaths.length > 0 ? correctPaths : allPaths;
-            let bestPath = targetPaths.length > 0 ? targetPaths[0] : [];
-
-            // 정답 경로 변환하여 movesHash 만들기
-            let movesHash = "";
-            bestPath.forEach(node => {
-                let moveMatch = [...node.matchAll(/[BW]\[([a-zA-Z]{2})\]/gi)];
-                moveMatch.forEach(m => {
-                    movesHash += transformStr(m[1].toLowerCase());
-                });
-            });
-
-            // 4. 새로운 해시 조합 및 적용
-            let hasSetup = (setupB_str.length > 0 || setupW_str.length > 0);
-            let newHash = "";
-            if (hasSetup) {
-                if (setupB_str) newHash += "B" + setupB_str;
-                if (setupW_str) newHash += "W" + setupW_str;
-                newHash += "_" + movesHash;
-            } else {
-                newHash = movesHash;
-            }
-
-            window.isSgfFileLoading = true;
-            window.loadedSgfIsProblem = isProblem; // 문제면 첫수면, 기보면 끝수면
-            window.location.hash = newHash;
-            event.target.value = ''; 
+            processSgfContent(e.target.result, true);
+            event.target.value = '';
         };
         reader.readAsText(file);
     }
 
+    function readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(reader.error || new Error('파일을 읽지 못했습니다.'));
+            reader.readAsText(file);
+        });
+    }
+
+    // 📂 폴더 불러오기 기능
+    // 폴더 전체를 한 번에 읽어 각 문제의 데이터를 URL 하나에 저장합니다.
+    async function loadSGFFolder(event) {
+        const files = Array.from(event.target.files || [])
+            .filter(file => file.name.toLowerCase().endsWith('.sgf'))
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+
+        if (files.length === 0) {
+            alert('폴더 내에 SGF 파일이 없습니다.');
+            return;
+        }
+
+        try {
+            const contents = await Promise.all(files.map(readFileAsText));
+            folderProblems = contents.map((content, index) => {
+                const result = processSgfContent(content, false);
+                return {
+                    name: files[index].name,
+                    hash: result.hash,
+                    isProblem: result.isProblem
+                };
+            });
+
+            isFolderMode = true;
+            currentFileIndex = 0;
+            currentFolderHash = folderProblems[0].hash;
+            currentMoveIndex = folderProblems[0].isProblem ? 0 : parseHashData(currentFolderHash).moves.length / 2;
+            isReviewMode = false;
+            savedReviewState = null;
+
+            // 현재 문제 번호와 관계없이 '폴더 전체'를 나타내는 URL을 한 번만 설정합니다.
+            // 이후 이전/다음 문제 이동에서는 window.location.hash를 절대 변경하지 않습니다.
+            const folderHash = getFolderUrlHash();
+            history.replaceState(null, '', window.location.href.split('#')[0] + '#' + folderHash);
+
+            document.getElementById('problem-nav').style.display = 'flex';
+            updateProblemCounter();
+            render();
+            event.target.value = '';
+        } catch (error) {
+            console.error(error);
+            alert('폴더의 SGF 파일을 읽는 중 오류가 발생했습니다.');
+        }
+    }
+
+    // 배열(폴더)에서 문제 로드
+    function loadSgfFromFileList(index) {
+        if (index < 0 || index >= folderProblems.length) return;
+
+        currentFileIndex = index;
+        const problem = folderProblems[index];
+        currentFolderHash = problem.hash;
+        currentMoveIndex = problem.isProblem ? 0 : parseHashData(currentFolderHash).moves.length / 2;
+        isReviewMode = false;
+        savedReviewState = null;
+
+        updateProblemCounter();
+        render();
+    }
+
+    // 이전 문제 이동
+    function prevProblem() {
+        if (!isFolderMode || folderProblems.length === 0) return;
+
+        if (currentFileIndex > 0) {
+            loadSgfFromFileList(currentFileIndex - 1);
+        } else {
+            alert("첫 번째 문제입니다.");
+        }
+    }
+
+    // 다음 문제 이동
+    function nextProblem() {
+        if (!isFolderMode || folderProblems.length === 0) return;
+
+        if (currentFileIndex < folderProblems.length - 1) {
+            loadSgfFromFileList(currentFileIndex + 1);
+        } else {
+            alert("마지막 문제입니다.");
+        }
+    }
+
+    // 문제 번호 직접 입력
+    function handleProblemInputEnter(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('problem-number-input').blur();
+        }
+    }
+
+    function jumpToProblem() {
+        if (!isFolderMode || folderProblems.length === 0) return;
+
+        let target = parseInt(document.getElementById('problem-number-input').value, 10);
+        if (isNaN(target)) target = currentFileIndex + 1;
+        target = Math.max(1, Math.min(folderProblems.length, target));
+        loadSgfFromFileList(target - 1);
+    }
+
+    // URL에 저장된 폴더 데이터를 복원
+    function loadFolderFromUrl() {
+        const rawHash = window.location.hash.substring(1);
+        if (!rawHash.startsWith(FOLDER_URL_PREFIX)) return false;
+
+        try {
+            const payload = decodeFolderPayload(rawHash.substring(FOLDER_URL_PREFIX.length));
+            if (!payload || !Array.isArray(payload.files) || payload.files.length === 0) {
+                throw new Error('폴더 데이터가 비어 있습니다.');
+            }
+
+            folderProblems = payload.files
+                .filter(item => item && typeof item.hash === 'string')
+                .map(item => ({
+                    name: item.name || '문제',
+                    hash: item.hash,
+                    isProblem: !!item.isProblem
+                }));
+
+            if (folderProblems.length === 0) throw new Error('유효한 문제 데이터가 없습니다.');
+
+            isFolderMode = true;
+            currentFileIndex = 0;
+            currentFolderHash = folderProblems[0].hash;
+            currentMoveIndex = folderProblems[0].isProblem ? 0 : parseHashData(currentFolderHash).moves.length / 2;
+            isReviewMode = false;
+            savedReviewState = null;
+
+            document.getElementById('problem-nav').style.display = 'flex';
+            updateProblemCounter();
+            return true;
+        } catch (error) {
+            console.error('폴더 URL 복원 실패:', error);
+            alert('폴더 URL 데이터를 불러오지 못했습니다.');
+            return false;
+        }
+    }
+
     function downloadSGF() {
-        let hash = window.location.hash.substring(1);
+        let hash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
         if (!hash) { alert("저장할 기보가 없습니다!"); return; }
 
         let { setupB, setupW, moves } = parseHashData(hash);
@@ -601,15 +874,29 @@
     }
 
     function copyLink() {
-        navigator.clipboard.writeText(window.location.href).then(() => alert("🔗 링크가 복사되었습니다!"));
+        const url = window.location.href;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(() => alert("🔗 링크가 복사되었습니다!"));
+        } else {
+            const textarea = document.createElement('textarea');
+            textarea.value = url;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            alert("🔗 링크가 복사되었습니다!");
+        }
     }
 
     initBoardLayout();
-    let initialHash = window.location.hash.substring(1);
-    if(initialHash) {
-        let { setupB, setupW, moves } = parseHashData(initialHash);
-        if (setupB || setupW) currentMoveIndex = 0;
-        else currentMoveIndex = moves.length / 2;
+    const loadedFolderFromUrl = loadFolderFromUrl();
+    if (!loadedFolderFromUrl) {
+        let initialHash = window.location.hash.substring(1);
+        if(initialHash) {
+            let { setupB, setupW, moves } = parseHashData(initialHash);
+            if (setupB || setupW) currentMoveIndex = 0;
+            else currentMoveIndex = moves.length / 2;
+        }
     }
     render();
 </script>
