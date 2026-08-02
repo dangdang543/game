@@ -149,6 +149,10 @@
     let currentFileIndex = -1;
     let isFolderMode = false;
     let currentFolderHash = '';
+    // 폴더 문제는 문제 전체(초기 배치 + 정답 수순)가 들어가는 영역을 기준으로
+    // 바둑판을 자동으로 확대/크롭합니다. 문제를 검토하는 동안에는 화면이 흔들리지 않도록
+    // 현재 문제를 불러올 때 계산한 viewBox를 그대로 유지합니다.
+    let currentFolderViewBox = '0 0 400 400';
 
     function initBoardLayout() {
         let html = '';
@@ -269,8 +273,108 @@
         return { board, moveCount, lastX, lastY };
     }
 
+    // 현재 문제에서 돌이 등장하는 영역을 계산해 폴더 모드용 정사각형 viewBox를 만듭니다.
+    //
+    // 귀 문제는 돌의 위치와 관계없이 해당 귀의 1-1점이 항상 보이도록 합니다.
+    // 예: 좌하귀라면 좌측/하측 경계를 1-1점(실제 바둑판 좌하단 교차점)에서
+    // 조금 바깥쪽으로 잡습니다. 이렇게 하면 돌이 1-1점에 놓이지 않아도 귀가
+    // 확실히 보이고, 좌측/하측의 여백도 같은 기준으로 맞춰집니다.
+    // 1-1점에서 바깥쪽 여백은 1.25칸 정도로 설정했습니다.
+    function getProblemViewBox(hashString) {
+        const { setupB, setupW, moves } = parseHashData(hashString);
+        const points = [];
+
+        function addCoords(coordString) {
+            for (let i = 0; i + 1 < coordString.length; i += 2) {
+                const x = chars.indexOf(coordString[i]);
+                const y = chars.indexOf(coordString[i + 1]);
+                if (x >= 0 && x < size && y >= 0 && y < size) {
+                    points.push({ x, y });
+                }
+            }
+        }
+
+        addCoords(setupB);
+        addCoords(setupW);
+        addCoords(moves);
+
+        // 좌표 정보가 전혀 없으면 전체 바둑판을 보여줍니다.
+        if (points.length === 0) return '0 0 400 400';
+
+        let minX = Math.min(...points.map(p => p.x));
+        let maxX = Math.max(...points.map(p => p.x));
+        let minY = Math.min(...points.map(p => p.y));
+        let maxY = Math.max(...points.map(p => p.y));
+
+        // 4-4점까지를 귀 영역으로 보고, 귀에 해당하면 돌과 관계없이
+        // 해당 귀의 1-1점을 반드시 포함합니다.
+        // 좌상귀: (0,0), 우상귀: (18,0), 좌하귀: (0,18), 우하귀: (18,18)
+        const nearLeftEdge = minX <= 3;
+        const nearRightEdge = maxX >= 15;
+        const nearTopEdge = minY <= 3;
+        const nearBottomEdge = maxY >= 15;
+
+        // 일반 영역은 돌 바깥으로 1칸, 귀의 1-1점은 그 점에서 바깥으로 1.25칸.
+        const contentMargin = 1;
+        const cornerMargin = 1.25;
+
+        let left = nearLeftEdge
+            ? pad + (0 - cornerMargin) * step
+            : pad + (minX - contentMargin) * step;
+        let right = nearRightEdge
+            ? pad + (18 + cornerMargin) * step
+            : pad + (maxX + contentMargin) * step;
+        let top = nearTopEdge
+            ? pad + (0 - cornerMargin) * step
+            : pad + (minY - contentMargin) * step;
+        let bottom = nearBottomEdge
+            ? pad + (18 + cornerMargin) * step
+            : pad + (maxY + contentMargin) * step;
+
+        // 정사각형 viewBox를 만들되, 귀 영역의 경우에는 해당 귀 방향의
+        // 경계(left/right/top/bottom)를 고정하여 1-1점 기준 여백이 유지되게 합니다.
+        let width = right - left;
+        let height = bottom - top;
+        let side = Math.max(width, height);
+
+        if (nearLeftEdge) {
+            right = left + side;
+        } else if (nearRightEdge) {
+            left = right - side;
+        } else {
+            const centerX = (left + right) / 2;
+            left = centerX - side / 2;
+            right = centerX + side / 2;
+        }
+
+        if (nearTopEdge) {
+            bottom = top + side;
+        } else if (nearBottomEdge) {
+            top = bottom - side;
+        } else {
+            const centerY = (top + bottom) / 2;
+            top = centerY - side / 2;
+            bottom = centerY + side / 2;
+        }
+
+        // 최종 영역은 좌표계 밖으로도 약간 나갈 수 있습니다.
+        // #board-container 자체의 배경이 바둑판 색이므로, 이렇게 해야
+        // 1-1점 바깥쪽에 '조금 더' 여유가 실제 화면에 표시됩니다.
+        const finalSide = Math.max(right - left, bottom - top);
+        if (finalSide <= 0) return '0 0 400 400';
+
+        return `${left} ${top} ${finalSide} ${finalSide}`;
+    }
+
+    // 폴더 모드에서는 해당 문제 영역만 크게 표시하고,
+    // 단일 SGF 모드에서는 기존처럼 19x19 전체 바둑판을 표시합니다.
+    function applyBoardViewBox() {
+        svg.setAttribute('viewBox', isFolderMode ? currentFolderViewBox : '0 0 400 400');
+    }
+
     function render() {
         let hash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
+        applyBoardViewBox();
         let { board, moveCount, lastX, lastY } = computeBoardState(hash, currentMoveIndex);
         let stonesGroup = document.getElementById('stones');
         let html = '';
@@ -309,10 +413,18 @@
     }
 
     document.getElementById('board-container').addEventListener('click', function(e) {
-        let rect = this.getBoundingClientRect();
-        let mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
-        let gridX = Math.round(((mouseX / rect.width) * 400 - pad) / step);
-        let gridY = Math.round(((mouseY / rect.height) * 400 - pad) / step);
+        // viewBox가 폴더 모드에서 자동으로 크롭되므로,
+        // 화면 좌표를 SVG 실제 좌표로 변환해서 착점 위치를 계산합니다.
+        const ctm = svg.getScreenCTM();
+        if (!ctm) return;
+
+        const point = svg.createSVGPoint();
+        point.x = e.clientX;
+        point.y = e.clientY;
+        const svgPoint = point.matrixTransform(ctm.inverse());
+
+        let gridX = Math.round((svgPoint.x - pad) / step);
+        let gridY = Math.round((svgPoint.y - pad) / step);
 
         if (gridX >= 0 && gridX < size && gridY >= 0 && gridY < size) {
             // 폴더 모드에서는 반드시 [검토] 상태에서만 착점을 허용합니다.
@@ -365,6 +477,7 @@
         folderProblems = [];
         currentFileIndex = -1;
         currentFolderHash = '';
+        currentFolderViewBox = '0 0 400 400';
         document.getElementById('problem-nav').style.display = 'none';
 
         let currentHash = window.location.hash.substring(1);
@@ -685,6 +798,7 @@
         folderProblems = [];
         currentFileIndex = -1;
         currentFolderHash = '';
+        currentFolderViewBox = '0 0 400 400';
         document.getElementById('problem-nav').style.display = 'none';
 
         const reader = new FileReader();
@@ -730,6 +844,7 @@
             isFolderMode = true;
             currentFileIndex = 0;
             currentFolderHash = folderProblems[0].hash;
+            currentFolderViewBox = getProblemViewBox(folderProblems[0].hash);
             currentMoveIndex = folderProblems[0].isProblem ? 0 : parseHashData(currentFolderHash).moves.length / 2;
             isReviewMode = false;
             savedReviewState = null;
@@ -756,6 +871,7 @@
         currentFileIndex = index;
         const problem = folderProblems[index];
         currentFolderHash = problem.hash;
+        currentFolderViewBox = getProblemViewBox(problem.hash);
         currentMoveIndex = problem.isProblem ? 0 : parseHashData(currentFolderHash).moves.length / 2;
         isReviewMode = false;
         savedReviewState = null;
@@ -827,6 +943,7 @@
             isFolderMode = true;
             currentFileIndex = 0;
             currentFolderHash = folderProblems[0].hash;
+            currentFolderViewBox = getProblemViewBox(folderProblems[0].hash);
             currentMoveIndex = folderProblems[0].isProblem ? 0 : parseHashData(currentFolderHash).moves.length / 2;
             isReviewMode = false;
             savedReviewState = null;
