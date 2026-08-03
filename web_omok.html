@@ -3,139 +3,182 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>URL 공유 오목</title>
+    <title>URL 공유 렌쥬 오목</title>
     <style>
         * { box-sizing: border-box; }
-        body { 
-            font-family: 'Malgun Gothic', sans-serif; 
-            background-color: #f0f2f5; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            min-height: 100vh; 
-            margin: 0; 
-            padding: 20px; 
+
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
         }
-        
+
         /* 데스크톱 & DEX 기본 디자인 (가로 배치) */
-        .container { 
-            background: white; 
-            padding: 20px; 
-            border-radius: 12px; 
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
-            display: flex; 
-            flex-direction: row; 
-            align-items: center; 
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            display: flex;
+            flex-direction: row;
+            align-items: center;
             gap: 20px;
             max-width: 100%;
         }
-        
-        #board-container { 
-            position: relative; 
-            /* 화면 높이에 맞춰 오목판 크기 최대화 */
-            width: 85vh; 
-            max-width: 70vw; /* 버튼 공간 확보용 제한 */
-            aspect-ratio: 1 / 1; 
-            background-color: #e6b873; 
-            border: 2px solid #b38644; 
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.15); 
-            cursor: pointer; 
-            border-radius: 4px; 
-            -webkit-user-select: none; 
-            user-select: none; 
+
+        #board-container {
+            position: relative;
+            width: 85vh;
+            max-width: 70vw;
+            aspect-ratio: 1 / 1;
+            background-color: #e6b873;
+            border: 2px solid #b38644;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+            border-radius: 4px;
+            -webkit-user-select: none;
+            user-select: none;
             flex-shrink: 0;
+            touch-action: manipulation;
         }
-        svg { width: 100%; height: 100%; display: block; }
+
+        #board-container.game-over {
+            cursor: default;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
 
         /* 오른쪽 사이드 패널 (상태창 + 버튼들) */
         .side-panel {
             display: flex;
             flex-direction: column;
             gap: 15px;
-            width: max-content; /* 버튼 너비 최소화 */
+            width: max-content;
         }
-        
-        .status-box { 
-            padding: 15px; 
-            background: #f9fafb; 
-            border-radius: 6px; 
-            font-size: 16px; 
-            font-weight: 600; 
+
+        .status-box {
+            padding: 15px;
+            background: #f9fafb;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
             text-align: center;
             white-space: nowrap;
+            border: 1px solid transparent;
         }
-        .turn-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+
+        .status-box.winner {
+            background: #ecfdf5;
+            border-color: #86efac;
+            color: #166534;
+        }
+
+        .status-box.draw {
+            background: #fff7ed;
+            border-color: #fdba74;
+            color: #9a3412;
+        }
+
+        .turn-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+
         .turn-B { background: black; }
-        .turn-W { background: white; border: 1px solid #ccc; }
+        .turn-W { background: white; border: 1px solid #aaa; }
+        .turn-D { background: #f59e0b; }
 
         /* 버튼 영역 (데스크톱에서는 2x2 배치) */
-        .controls { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 8px; 
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
         }
-        button { 
-            padding: 12px 16px; 
-            font-size: 14px; 
-            font-weight: bold; 
-            border: none; 
-            border-radius: 6px; 
-            cursor: pointer; 
-            letter-spacing: -0.5px; 
-            transition: all 0.2s; 
-            -webkit-tap-highlight-color: transparent; 
-            white-space: nowrap; 
+
+        button {
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            letter-spacing: -0.5px;
+            transition: all 0.2s;
+            -webkit-tap-highlight-color: transparent;
+            white-space: nowrap;
         }
-        
+
+        button:active {
+            transform: translateY(1px);
+        }
+
         .btn-primary { background-color: #4f46e5; color: white; }
         .btn-secondary { background-color: #9ca3af; color: white; }
-        .btn-info { background-color: #0ea5e9; color: white; } 
-        .btn-danger { background-color: #ef4444; color: white; } 
-        
+        .btn-info { background-color: #0ea5e9; color: white; }
+        .btn-danger { background-color: #ef4444; color: white; }
 
-        /* 모바일 화면 디자인 (기존 디자인 유지) */
+        /* 모바일 화면 디자인 */
         @media (max-width: 768px) {
-            body { 
-                padding: 0; 
-                background-color: white; 
+            body {
+                padding: 0;
+                background-color: white;
                 align-items: flex-start;
             }
-            .container { 
-                flex-direction: column; 
-                padding: 5px; 
-                border-radius: 0; 
-                box-shadow: none; 
+
+            .container {
+                flex-direction: column;
+                padding: 5px;
+                border-radius: 0;
+                box-shadow: none;
                 gap: 0;
                 width: 100%;
             }
-            #board-container { 
-                width: 100%; 
-                height: auto; 
-                max-width: 100%; 
-                border-left: none; 
-                border-right: none; 
-                border-radius: 0; 
+
+            #board-container {
+                width: 100%;
+                height: auto;
+                max-width: 100%;
+                border-left: none;
+                border-right: none;
+                border-radius: 0;
             }
+
             .side-panel {
                 width: 100%;
                 padding: 0 5px;
                 gap: 0;
             }
-            .status-box { 
+
+            .status-box {
                 margin-top: 10px;
-                font-size: 14px; 
+                font-size: 14px;
                 padding: 10px;
             }
-            .controls { 
-                display: flex; /* 모바일에서는 다시 1줄로 꽉 차게 */
-                margin-top: 10px; 
-                width: 100%; 
-                gap: 4px; 
+
+            .controls {
+                display: flex;
+                margin-top: 10px;
+                width: 100%;
+                gap: 4px;
             }
-            button { 
-                flex: 1; 
-                padding: 10px 0; 
-                font-size: 12px; 
+
+            button {
+                flex: 1;
+                padding: 10px 0;
+                font-size: 12px;
             }
         }
     </style>
@@ -148,7 +191,7 @@
     </div>
 
     <div class="side-panel">
-        <div class="status-box">
+        <div class="status-box" id="status-box">
             <span id="turn-color" class="turn-indicator turn-B"></span>
             <span id="status-text">흑의 차례 (총 0수)</span>
         </div>
@@ -166,155 +209,592 @@
     const size = 15;
     const chars = 'abcdefghijklmno';
     const svg = document.getElementById('omok-board');
-    const pad = 16, step = 20;
-    
-    // 수순 보기 상태 저장 변수
+    const boardContainer = document.getElementById('board-container');
+    const statusBox = document.getElementById('status-box');
+    const pad = 16;
+    const step = 20;
+
+    const DIRECTIONS = [
+        [1, 0],   // 가로
+        [0, 1],   // 세로
+        [1, 1],   // 좌상-우하 대각선
+        [1, -1]   // 좌하-우상 대각선
+    ];
+
     let showNumbers = false;
+    let currentGameState = null;
+
+    function makeEmptyBoard() {
+        return Array.from({ length: size }, () => Array(size).fill(null));
+    }
+
+    function isInside(x, y) {
+        return x >= 0 && x < size && y >= 0 && y < size;
+    }
+
+    function getColor(board, x, y) {
+        if (!isInside(x, y) || board[y][x] === null) return null;
+        return board[y][x].color;
+    }
+
+    function putTemporaryBlack(board, x, y) {
+        board[y][x] = { color: 'B', no: 0 };
+    }
+
+    function removeTemporaryStone(board, x, y) {
+        board[y][x] = null;
+    }
 
     function initBoardLayout() {
         let html = '';
-        for(let i=0; i<size; i++) {
-            let pos = pad + i * step;
-            html += `<line x1="${pad}" y1="${pos}" x2="${pad + (size-1)*step}" y2="${pos}" stroke="#444" stroke-width="0.8"/>`;
-            html += `<line x1="${pos}" y1="${pad}" x2="${pos}" y2="${pad + (size-1)*step}" stroke="#444" stroke-width="0.8"/>`;
+
+        for (let i = 0; i < size; i++) {
+            const pos = pad + i * step;
+            html += `<line x1="${pad}" y1="${pos}" x2="${pad + (size - 1) * step}" y2="${pos}" stroke="#444" stroke-width="0.8"/>`;
+            html += `<line x1="${pos}" y1="${pad}" x2="${pos}" y2="${pad + (size - 1) * step}" stroke="#444" stroke-width="0.8"/>`;
         }
+
         const center = 7;
         const side = 3;
         const stars = [side, center, size - 1 - side];
+
         stars.forEach(cx => {
             stars.forEach(cy => {
-                if((cx === center || cy === center) || (cx !== center && cy !== center)) {
-                    html += `<circle cx="${pad + cx * step}" cy="${pad + cy * step}" r="2.2" fill="#222"/>`;
-                }
+                html += `<circle cx="${pad + cx * step}" cy="${pad + cy * step}" r="2.2" fill="#222"/>`;
             });
         });
-        html += `<g id="stones"></g>`;
+
+        html += '<g id="stones"></g>';
         svg.innerHTML = html;
     }
 
-    // 수순보기 버튼 토글 함수
     function toggleNumbers() {
         showNumbers = !showNumbers;
         const btn = document.getElementById('btn-numbers');
-        if(showNumbers) {
+
+        if (showNumbers) {
             btn.innerHTML = '숫자숨김';
-            btn.style.backgroundColor = '#0284c7'; // 활성화 시 살짝 어두운 파란색
+            btn.style.backgroundColor = '#0284c7';
         } else {
             btn.innerHTML = '🔢 수순보기';
-            btn.style.backgroundColor = '#0ea5e9'; // 원래 색
+            btn.style.backgroundColor = '#0ea5e9';
         }
-        render(); // 바둑판 다시 그리기
+
+        render();
+    }
+
+    /*
+     * 한 점을 중심으로 특정 방향의 연속된 같은 색 돌 개수를 구합니다.
+     */
+    function getLineLength(board, x, y, dx, dy, color) {
+        if (getColor(board, x, y) !== color) return 0;
+
+        let count = 1;
+
+        let nx = x + dx;
+        let ny = y + dy;
+        while (isInside(nx, ny) && getColor(board, nx, ny) === color) {
+            count++;
+            nx += dx;
+            ny += dy;
+        }
+
+        nx = x - dx;
+        ny = y - dy;
+        while (isInside(nx, ny) && getColor(board, nx, ny) === color) {
+            count++;
+            nx -= dx;
+            ny -= dy;
+        }
+
+        return count;
+    }
+
+    function hasExactFiveAt(board, x, y, color) {
+        return DIRECTIONS.some(([dx, dy]) =>
+            getLineLength(board, x, y, dx, dy, color) === 5
+        );
+    }
+
+    function hasFiveOrMoreAt(board, x, y, color) {
+        return DIRECTIONS.some(([dx, dy]) =>
+            getLineLength(board, x, y, dx, dy, color) >= 5
+        );
+    }
+
+    function hasOverlineAt(board, x, y) {
+        return DIRECTIONS.some(([dx, dy]) =>
+            getLineLength(board, x, y, dx, dy, 'B') >= 6
+        );
+    }
+
+    function serializeBoard(board) {
+        let result = '';
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                result += board[y][x] === null ? '.' : board[y][x].color;
+            }
+        }
+        return result;
+    }
+
+    function coordinateKey(x, y) {
+        return `${x},${y}`;
+    }
+
+    /*
+     * originX, originY에 둔 흑돌 때문에 새로 생긴 '4'의 개수를 셉니다.
+     * 열린 4(.BBBB.)는 이기는 점이 2개여도 하나의 4로 계산합니다.
+     */
+    function countFoursMadeBy(board, originX, originY) {
+        const fours = new Set();
+
+        DIRECTIONS.forEach(([dx, dy], directionIndex) => {
+            for (let startOffset = -4; startOffset <= 0; startOffset++) {
+                const positions = [];
+                let validWindow = true;
+
+                for (let i = 0; i < 5; i++) {
+                    const x = originX + (startOffset + i) * dx;
+                    const y = originY + (startOffset + i) * dy;
+
+                    if (!isInside(x, y)) {
+                        validWindow = false;
+                        break;
+                    }
+                    positions.push({ x, y });
+                }
+
+                if (!validWindow) continue;
+
+                let blackCount = 0;
+                const emptyPoints = [];
+                const blackPoints = [];
+
+                positions.forEach(({ x, y }) => {
+                    const color = getColor(board, x, y);
+                    if (color === 'B') {
+                        blackCount++;
+                        blackPoints.push(coordinateKey(x, y));
+                    } else if (color === null) {
+                        emptyPoints.push({ x, y });
+                    }
+                });
+
+                if (blackCount !== 4 || emptyPoints.length !== 1) continue;
+                if (!blackPoints.includes(coordinateKey(originX, originY))) continue;
+
+                const empty = emptyPoints[0];
+                putTemporaryBlack(board, empty.x, empty.y);
+                const makesExactFive =
+                    getLineLength(board, empty.x, empty.y, dx, dy, 'B') === 5;
+                removeTemporaryStone(board, empty.x, empty.y);
+
+                if (!makesExactFive) continue;
+
+                blackPoints.sort();
+                fours.add(`${directionIndex}:${blackPoints.join('|')}`);
+            }
+        });
+
+        return fours.size;
+    }
+
+    /*
+     * extensionX, extensionY에 흑돌을 가상으로 둔 뒤 특정 방향에 만들어진
+     * 열린 4(.BBBB.)를 찾습니다. origin과 extension이 모두 그 4에 포함되어야 합니다.
+     */
+    function getStraightFoursInDirection(
+        board,
+        originX,
+        originY,
+        extensionX,
+        extensionY,
+        dx,
+        dy,
+        directionIndex
+    ) {
+        const straightFours = [];
+        const seen = new Set();
+
+        for (let startOffset = -3; startOffset <= 0; startOffset++) {
+            const stones = [];
+            let valid = true;
+
+            for (let i = 0; i < 4; i++) {
+                const x = originX + (startOffset + i) * dx;
+                const y = originY + (startOffset + i) * dy;
+
+                if (!isInside(x, y) || getColor(board, x, y) !== 'B') {
+                    valid = false;
+                    break;
+                }
+                stones.push({ x, y });
+            }
+
+            if (!valid) continue;
+
+            const includesExtension = stones.some(
+                point => point.x === extensionX && point.y === extensionY
+            );
+            if (!includesExtension) continue;
+
+            const left = {
+                x: originX + (startOffset - 1) * dx,
+                y: originY + (startOffset - 1) * dy
+            };
+            const right = {
+                x: originX + (startOffset + 4) * dx,
+                y: originY + (startOffset + 4) * dy
+            };
+
+            if (!isInside(left.x, left.y) || !isInside(right.x, right.y)) continue;
+            if (getColor(board, left.x, left.y) !== null) continue;
+            if (getColor(board, right.x, right.y) !== null) continue;
+
+            putTemporaryBlack(board, left.x, left.y);
+            const leftMakesExactFive =
+                getLineLength(board, left.x, left.y, dx, dy, 'B') === 5;
+            removeTemporaryStone(board, left.x, left.y);
+
+            putTemporaryBlack(board, right.x, right.y);
+            const rightMakesExactFive =
+                getLineLength(board, right.x, right.y, dx, dy, 'B') === 5;
+            removeTemporaryStone(board, right.x, right.y);
+
+            if (!leftMakesExactFive || !rightMakesExactFive) continue;
+
+            const key = `${directionIndex}:${stones
+                .map(point => coordinateKey(point.x, point.y))
+                .sort()
+                .join('|')}`;
+
+            if (!seen.has(key)) {
+                seen.add(key);
+                straightFours.push({ directionIndex, stones });
+            }
+        }
+
+        return straightFours;
+    }
+
+    /*
+     * origin에 둔 흑돌로 생긴 '실제 열린 3'의 개수를 셉니다.
+     * 열린 4를 만드는 다음 수가 장목·4-4·금지된 3-3이면 가짜 3으로 처리합니다.
+     * 이 부분은 국제 렌쥬 규칙 9.3의 재귀 판정을 구현한 것입니다.
+     */
+    function countLegalThreesMadeBy(board, originX, originY, memo) {
+        const threes = new Set();
+
+        DIRECTIONS.forEach(([dx, dy], directionIndex) => {
+            for (let distance = -3; distance <= 3; distance++) {
+                if (distance === 0) continue;
+
+                const extensionX = originX + distance * dx;
+                const extensionY = originY + distance * dy;
+
+                if (!isInside(extensionX, extensionY)) continue;
+                if (board[extensionY][extensionX] !== null) continue;
+
+                putTemporaryBlack(board, extensionX, extensionY);
+
+                /* 3에서 열린 4로 키우는 수가 동시에 5목을 만들면 '3'이 아닙니다. */
+                const makesFive = hasExactFiveAt(board, extensionX, extensionY, 'B');
+
+                const straightFours = makesFive
+                    ? []
+                    : getStraightFoursInDirection(
+                        board,
+                        originX,
+                        originY,
+                        extensionX,
+                        extensionY,
+                        dx,
+                        dy,
+                        directionIndex
+                    );
+
+                removeTemporaryStone(board, extensionX, extensionY);
+
+                if (straightFours.length === 0) continue;
+
+                /* 열린 4를 만드는 가상 착수 자체도 흑에게 합법이어야 합니다. */
+                if (isForbiddenBlackMove(board, extensionX, extensionY, memo)) continue;
+
+                straightFours.forEach(straightFour => {
+                    const originalThree = straightFour.stones.filter(
+                        point => point.x !== extensionX || point.y !== extensionY
+                    );
+
+                    if (originalThree.length !== 3) return;
+
+                    const includesOrigin = originalThree.some(
+                        point => point.x === originX && point.y === originY
+                    );
+                    if (!includesOrigin) return;
+
+                    const key = `${directionIndex}:${originalThree
+                        .map(point => coordinateKey(point.x, point.y))
+                        .sort()
+                        .join('|')}`;
+                    threes.add(key);
+                });
+            }
+        });
+
+        return threes.size;
+    }
+
+    /*
+     * 흑의 착수금지 판정
+     * 우선순위: 정확한 5목 승리 > 장목 > 4-4 > 금지된 3-3
+     */
+    function isForbiddenBlackMove(board, x, y, memo = new Map()) {
+        if (!isInside(x, y) || board[y][x] !== null) return true;
+
+        const memoKey = `${serializeBoard(board)}:${x},${y}`;
+        if (memo.has(memoKey)) return memo.get(memoKey);
+
+        putTemporaryBlack(board, x, y);
+
+        let forbidden = false;
+
+        /* 국제 규칙상 같은 수로 정확한 5목을 만들면 먼저 승리입니다. */
+        if (hasExactFiveAt(board, x, y, 'B')) {
+            forbidden = false;
+        } else if (hasOverlineAt(board, x, y)) {
+            forbidden = true;
+        } else if (countFoursMadeBy(board, x, y) >= 2) {
+            forbidden = true;
+        } else if (countLegalThreesMadeBy(board, x, y, memo) >= 2) {
+            forbidden = true;
+        }
+
+        removeTemporaryStone(board, x, y);
+        memo.set(memoKey, forbidden);
+        return forbidden;
+    }
+
+    function getWinnerAfterMove(board, x, y, color) {
+        if (color === 'B' && hasExactFiveAt(board, x, y, 'B')) return 'B';
+        if (color === 'W' && hasFiveOrMoreAt(board, x, y, 'W')) return 'W';
+        return null;
     }
 
     function computeBoardState(hashString) {
-        let board = Array(size).fill(null).map(() => Array(size).fill(null));
+        const board = makeEmptyBoard();
         let moveCount = 0;
-        let lastX = -1, lastY = -1;
+        let lastX = -1;
+        let lastY = -1;
+        let winner = null;
+        let draw = false;
+        let validHash = '';
 
-        for (let i = 0; i < hashString.length; i += 2) {
-            let x = chars.indexOf(hashString[i]);
-            let y = chars.indexOf(hashString[i+1]);
-            if (x >= 0 && x < size && y >= 0 && y < size) {
-                if (board[y][x] !== null) continue; 
-                moveCount++;
-                let color = (moveCount % 2 !== 0) ? 'B' : 'W';
-                // 돌의 색상뿐만 아니라 몇 번째 수(no)인지도 함께 저장합니다.
-                board[y][x] = { color: color, no: moveCount }; 
-                lastX = x;
-                lastY = y;
+        for (let i = 0; i + 1 < hashString.length; i += 2) {
+            if (winner || draw) break;
+
+            const x = chars.indexOf(hashString[i]);
+            const y = chars.indexOf(hashString[i + 1]);
+
+            if (!isInside(x, y) || board[y][x] !== null) break;
+
+            const color = moveCount % 2 === 0 ? 'B' : 'W';
+
+            if (color === 'B' && isForbiddenBlackMove(board, x, y)) {
+                break;
             }
+
+            moveCount++;
+            board[y][x] = { color, no: moveCount };
+            lastX = x;
+            lastY = y;
+            validHash += chars[x] + chars[y];
+
+            winner = getWinnerAfterMove(board, x, y, color);
+            draw = !winner && moveCount === size * size;
         }
-        return { board, moveCount, lastX, lastY };
+
+        return {
+            board,
+            moveCount,
+            lastX,
+            lastY,
+            winner,
+            draw,
+            validHash,
+            gameOver: Boolean(winner || draw)
+        };
     }
 
     function render() {
-        let hash = window.location.hash.substring(1);
-        let { board, moveCount, lastX, lastY } = computeBoardState(hash);
-        let stonesGroup = document.getElementById('stones');
+        const hash = window.location.hash.substring(1);
+        const state = computeBoardState(hash);
+        currentGameState = state;
+
+        /* 직접 수정된 잘못된 URL 수순은 마지막 합법 수까지만 남깁니다. */
+        if (state.validHash !== hash) {
+            const cleanUrl = state.validHash
+                ? `${window.location.pathname}${window.location.search}#${state.validHash}`
+                : `${window.location.pathname}${window.location.search}`;
+            history.replaceState(null, '', cleanUrl);
+        }
+
+        const stonesGroup = document.getElementById('stones');
         let html = '';
-        
+
         for (let y = 0; y < size; y++) {
             for (let x = 0; x < size; x++) {
-                if (board[y][x] !== null) {
-                    let cell = board[y][x];
-                    let cx = pad + x * step, cy = pad + y * step;
-                    let isLast = (x === lastX && y === lastY);
-                    
-                    if (cell.color === 'B') {
-                        html += `<circle cx="${cx}" cy="${cy}" r="9" fill="#111" stroke="#000" stroke-width="0.5"/>`;
-                        if (showNumbers) {
-                            // 수순 번호 그리기 (흑돌 위엔 흰색 글씨)
-                            html += `<text x="${cx}" y="${cy}" fill="#fff" font-size="8.5" font-family="Arial" font-weight="bold" text-anchor="middle" dominant-baseline="central" dy="0.5">${cell.no}</text>`;
-                        } else if (isLast) {
-                            html += `<circle cx="${cx}" cy="${cy}" r="2.5" fill="#ef4444"/>`;
-                        }
-                    } else {
-                        html += `<circle cx="${cx}" cy="${cy}" r="9" fill="#fff" stroke="#888" stroke-width="0.8"/>`;
-                        if (showNumbers) {
-                            // 수순 번호 그리기 (백돌 위엔 검은색 글씨)
-                            html += `<text x="${cx}" y="${cy}" fill="#000" font-size="8.5" font-family="Arial" font-weight="bold" text-anchor="middle" dominant-baseline="central" dy="0.5">${cell.no}</text>`;
-                        } else if (isLast) {
-                            html += `<circle cx="${cx}" cy="${cy}" r="2.5" fill="#ef4444"/>`;
-                        }
+                const cell = state.board[y][x];
+                if (cell === null) continue;
+
+                const cx = pad + x * step;
+                const cy = pad + y * step;
+                const isLast = x === state.lastX && y === state.lastY;
+
+                if (cell.color === 'B') {
+                    html += `<circle cx="${cx}" cy="${cy}" r="9" fill="#111" stroke="#000" stroke-width="0.5"/>`;
+
+                    if (showNumbers) {
+                        html += `<text x="${cx}" y="${cy}" fill="#fff" font-size="8.5" font-family="Arial" font-weight="bold" text-anchor="middle" dominant-baseline="central" dy="0.5">${cell.no}</text>`;
+                    } else if (isLast) {
+                        html += `<circle cx="${cx}" cy="${cy}" r="2.5" fill="#ef4444"/>`;
+                    }
+                } else {
+                    html += `<circle cx="${cx}" cy="${cy}" r="9" fill="#fff" stroke="#888" stroke-width="0.8"/>`;
+
+                    if (showNumbers) {
+                        html += `<text x="${cx}" y="${cy}" fill="#000" font-size="8.5" font-family="Arial" font-weight="bold" text-anchor="middle" dominant-baseline="central" dy="0.5">${cell.no}</text>`;
+                    } else if (isLast) {
+                        html += `<circle cx="${cx}" cy="${cy}" r="2.5" fill="#ef4444"/>`;
                     }
                 }
             }
         }
+
         stonesGroup.innerHTML = html;
-        let nextColor = (moveCount % 2 === 0) ? 'B' : 'W';
-        document.getElementById('turn-color').className = `turn-indicator turn-${nextColor}`;
-        document.getElementById('status-text').innerText = `${nextColor === 'B' ? '흑' : '백'}의 차례 (총 ${moveCount}수)`;
+        updateStatus(state);
     }
 
-    document.getElementById('board-container').addEventListener('click', function(e) {
-        let rect = this.getBoundingClientRect();
-        let mouseX = e.clientX - rect.left, mouseY = e.clientY - rect.top;
-        
-        let gridX = Math.round(((mouseX / rect.width) * 320 - pad) / step);
-        let gridY = Math.round(((mouseY / rect.height) * 320 - pad) / step);
+    function updateStatus(state) {
+        const indicator = document.getElementById('turn-color');
+        const statusText = document.getElementById('status-text');
 
-        if (gridX >= 0 && gridX < size && gridY >= 0 && gridY < size) {
-            let currentHash = window.location.hash.substring(1);
-            let { board } = computeBoardState(currentHash);
-            
-            if (board[gridY][gridX] === null) {
-                let nextMove = chars[gridX] + chars[gridY];
-                let newHash = currentHash + nextMove;
-                
-                // 깜빡임 해결: hash 직접 할당을 막고 pushState 사용
-                history.pushState(null, '', '#' + newHash);
-                render();
-            }
+        statusBox.className = 'status-box';
+        boardContainer.classList.toggle('game-over', state.gameOver);
+
+        if (state.winner) {
+            const winnerName = state.winner === 'B' ? '흑' : '백';
+            indicator.className = `turn-indicator turn-${state.winner}`;
+            statusText.innerText = `${winnerName}이 이겼습니다! (총 ${state.moveCount}수)`;
+            statusBox.classList.add('winner');
+            return;
+        }
+
+        if (state.draw) {
+            indicator.className = 'turn-indicator turn-D';
+            statusText.innerText = `무승부입니다. (총 ${state.moveCount}수)`;
+            statusBox.classList.add('draw');
+            return;
+        }
+
+        const nextColor = state.moveCount % 2 === 0 ? 'B' : 'W';
+        indicator.className = `turn-indicator turn-${nextColor}`;
+        statusText.innerText = `${nextColor === 'B' ? '흑' : '백'}의 차례 (총 ${state.moveCount}수)`;
+    }
+
+    boardContainer.addEventListener('click', function (event) {
+        const state = currentGameState || computeBoardState(window.location.hash.substring(1));
+
+        if (state.gameOver) return;
+
+        const rect = this.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        const gridX = Math.round(((mouseX / rect.width) * 320 - pad) / step);
+        const gridY = Math.round(((mouseY / rect.height) * 320 - pad) / step);
+
+        if (!isInside(gridX, gridY)) return;
+        if (state.board[gridY][gridX] !== null) return;
+
+        const nextColor = state.moveCount % 2 === 0 ? 'B' : 'W';
+
+        if (nextColor === 'B' && isForbiddenBlackMove(state.board, gridX, gridY)) {
+            alert('착수금지점입니다');
+            return;
+        }
+
+        const nextMove = chars[gridX] + chars[gridY];
+        const newHash = state.validHash + nextMove;
+
+        history.pushState(null, '', '#' + newHash);
+        render();
+
+        if (currentGameState.winner) {
+            alert(`${currentGameState.winner === 'B' ? '흑' : '백'}이 이겼습니다!`);
+        } else if (currentGameState.draw) {
+            alert('무승부입니다.');
         }
     });
 
     function copyLink() {
-        navigator.clipboard.writeText(window.location.href).then(() => alert("🔗 오목 링크가 복사되었습니다!"));
-    }
-    
-    function undoMove() {
-        let currentHash = window.location.hash.substring(1);
-        if (currentHash.length >= 2) {
-            let newHash = currentHash.slice(0, -2);
-            // 무르기 시에도 깜빡임 방지
-            history.pushState(null, '', '#' + newHash);
-            render();
+        const url = window.location.href;
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(url)
+                .then(() => alert('🔗 오목 링크가 복사되었습니다!'))
+                .catch(() => fallbackCopyLink(url));
+        } else {
+            fallbackCopyLink(url);
         }
     }
-    
-    function resetBoard() {
-        if (confirm("판을 비우고 새로 시작하시겠습니까?")) {
-            // 초기화 시에도 깜빡임 방지
-            history.pushState(null, '', window.location.pathname + window.location.search);
+
+    function fallbackCopyLink(url) {
+        const textarea = document.createElement('textarea');
+        textarea.value = url;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+
+        try {
+            document.execCommand('copy');
+            alert('🔗 오목 링크가 복사되었습니다!');
+        } catch (error) {
+            prompt('아래 링크를 복사해 주세요.', url);
+        } finally {
+            textarea.remove();
+        }
+    }
+
+    function undoMove() {
+        const currentHash = window.location.hash.substring(1);
+
+        if (currentHash.length >= 2) {
+            const newHash = currentHash.slice(0, -2);
+            const newUrl = newHash
+                ? `${window.location.pathname}${window.location.search}#${newHash}`
+                : `${window.location.pathname}${window.location.search}`;
+
+            history.pushState(null, '', newUrl);
             render();
         }
     }
 
-    // 뒤로가기/앞으로가기 버튼을 눌렀을 때를 위한 이벤트 리스너 추가
+    function resetBoard() {
+        if (confirm('판을 비우고 새로 시작하시겠습니까?')) {
+            history.pushState(
+                null,
+                '',
+                window.location.pathname + window.location.search
+            );
+            render();
+        }
+    }
+
     window.addEventListener('popstate', render);
-    // 기존 hashchange 이벤트도 호환성을 위해 유지
     window.addEventListener('hashchange', render);
-    
+
     initBoardLayout();
     render();
 </script>
