@@ -413,6 +413,19 @@
     }
 
     document.getElementById('board-container').addEventListener('click', function(e) {
+        // 폴더 모드이면서 검토 모드가 아닐 때: 화면 좌/우 터치로 정답 진행 및 역진행 처리
+        if (isFolderMode && !isReviewMode) {
+            const rect = this.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            // 클릭한 X좌표가 전체 너비의 절반보다 크면 오른쪽, 작으면 왼쪽
+            if (clickX > rect.width / 2) {
+                goNextMove();
+            } else {
+                goPrevMove();
+            }
+            return; // 검토 모드가 아니므로 아래 착점 로직은 생략합니다.
+        }
+
         // viewBox가 폴더 모드에서 자동으로 크롭되므로,
         // 화면 좌표를 SVG 실제 좌표로 변환해서 착점 위치를 계산합니다.
         const ctm = svg.getScreenCTM();
@@ -427,12 +440,6 @@
         let gridY = Math.round((svgPoint.y - pad) / step);
 
         if (gridX >= 0 && gridX < size && gridY >= 0 && gridY < size) {
-            // 폴더 모드에서는 반드시 [검토] 상태에서만 착점을 허용합니다.
-            // 검토 중이 아니면 문제 원본 데이터가 실수로 변경되지 않도록 즉시 종료합니다.
-            if (isFolderMode && !isReviewMode) {
-                return;
-            }
-
             let currentHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
             
             let { board } = computeBoardState(currentHash, currentMoveIndex);
@@ -563,10 +570,21 @@
         }
     }
 
+    // 키보드 단축키 추가 (이전/다음문제 PageUp/PageDown 포함)
     document.addEventListener('keydown', (e) => {
         if (document.activeElement.tagName === 'INPUT') return;
         if (e.key === 'ArrowLeft') goPrevMove();
         if (e.key === 'ArrowRight') goNextMove();
+        if (isFolderMode) {
+            if (e.key === 'PageDown') {
+                e.preventDefault(); // 스크롤 방지
+                nextProblem();
+            }
+            if (e.key === 'PageUp') {
+                e.preventDefault(); // 스크롤 방지
+                prevProblem();
+            }
+        }
     });
 
     function captureBoard() {
