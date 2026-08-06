@@ -6,11 +6,12 @@
     <title>웹 바둑판</title>
     <style>
         * { box-sizing: border-box; }
-        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f0f2f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+        /* 배경을 검은색으로, 기본 글자색을 밝은 색으로 변경 */
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #000000; color: #f3f4f6; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
         
         /* PC 및 Dex 화면: 가로 배치 (좌 바둑판, 우 사이드바) */
         .container { 
-            background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); 
+            background: #1a1a1a; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(255,255,255,0.05); 
             display: flex; flex-direction: row; align-items: flex-start; justify-content: center; 
             width: 100%; max-width: 1200px; gap: 30px;
         }
@@ -29,9 +30,10 @@
             flex: 0 0 320px; display: flex; flex-direction: column; gap: 15px; width: 100%;
         }
 
-        .status-box { padding: 12px; background: #f9fafb; border-radius: 6px; font-size: 15px; font-weight: bold; color: #333; text-align: center; }
+        /* 상태창 다크 모드 적용 */
+        .status-box { padding: 12px; background: #2d2d2d; border-radius: 6px; font-size: 15px; font-weight: bold; color: #f3f4f6; text-align: center; }
         .turn-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
-        .turn-B { background: black; }
+        .turn-B { background: black; border: 1px solid #555; }
         .turn-W { background: white; border: 1px solid #ccc; }
 
         .controls-container { display: flex; flex-direction: column; gap: 10px; }
@@ -54,18 +56,21 @@
         .btn-capture { background-color: #be185d; color: white; flex: 1.5 !important; }
         .btn-review.active { background-color: #dc2626; animation: pulse 1.5s infinite; }
 
-        .btn-folder-nav { background-color: #1f2937; color: white; font-size: 13px !important; flex: 1 !important; }
+        .btn-folder-nav { background-color: #374151; color: white; font-size: 13px !important; flex: 1 !important; }
         .btn-detail { background-color: #0f766e; color: white; font-size: 14px !important; }
-        .btn-detail:disabled { background-color: #9ca3af; color: #f3f4f6; cursor: not-allowed; opacity: 0.75; }
+        .btn-detail:disabled { background-color: #4b5563; color: #9ca3af; cursor: not-allowed; opacity: 0.75; }
         .btn-detail:disabled:active { transform: none; }
         
         .row-3, .row-4 { display: none; } /* 폴더 로드 전에 숨김 */
-        .problem-counter-box { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 14px; font-weight: bold; align-self: center; background: #f9fafb; padding: 6px 4px; border-radius: 6px; border: 1px solid #e5e7eb; color: #333; }
-        #problem-number-input { width: 58px; min-width: 0; padding: 4px 2px; text-align: center; font-size: 14px; font-weight: bold; border: 1px solid #cbd5e1; border-radius: 5px; outline: none; background: white; color: #333; }
-        #problem-number-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,0.12); }
+        /* 카운터 박스 다크 모드 적용 */
+        .problem-counter-box { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 14px; font-weight: bold; align-self: center; background: #2d2d2d; padding: 6px 4px; border-radius: 6px; border: 1px solid #444; color: #f3f4f6; }
+        /* 입력창 다크 모드 적용 */
+        #problem-number-input { width: 58px; min-width: 0; padding: 4px 2px; text-align: center; font-size: 14px; font-weight: bold; border: 1px solid #555; border-radius: 5px; outline: none; background: #1f2937; color: #f3f4f6; }
+        #problem-number-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,0.3); }
         #problem-total { min-width: 20px; text-align: left; }
 
-        #move-input { width: 55px; flex-shrink: 0; text-align: center; font-size: 15px; font-weight: bold; border: 2px solid #ccc; border-radius: 6px; outline: none; }
+        /* 수순 입력창 다크 모드 적용 */
+        #move-input { width: 55px; flex-shrink: 0; text-align: center; font-size: 15px; font-weight: bold; border: 2px solid #555; border-radius: 6px; outline: none; background: #1f2937; color: #f3f4f6; }
         #move-input:focus { border-color: #4f46e5; }
 
         @keyframes pulse {
@@ -74,10 +79,10 @@
             100% { opacity: 1; }
         }
 
-        /* 모바일 대응: 세로 배치로 변경 */
+        /* 모바일 대응: 세로 배치로 변경 및 배경 검은색 유지 */
         @media (max-width: 800px) {
-            body { padding: 0; background-color: white; align-items: flex-start; }
-            .container { flex-direction: column; align-items: center; padding: 10px; border-radius: 0; box-shadow: none; gap: 15px; }
+            body { padding: 0; background-color: #000000; align-items: flex-start; }
+            .container { flex-direction: column; align-items: center; padding: 10px; border-radius: 0; box-shadow: none; gap: 15px; background: transparent; }
             #board-container { border-left: none; border-right: none; border-radius: 0; max-width: 100vw; flex: none; }
             .sidebar { flex: none; max-width: max(300px, calc(100vh - 220px)); }
             .row-1 > button, .row-2 > button, .row-3 > button, .row-4 > button { font-size: 11px; padding: 10px 2px; }
