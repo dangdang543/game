@@ -39,6 +39,7 @@
         
         button { border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s; -webkit-tap-highlight-color: transparent; font-family: inherit; }
         button:active { transform: scale(0.96); }
+        button.keyboard-active { transform: scale(0.96); filter: brightness(0.9); }
         
         .row-1 > button, .row-2 > button, .row-3 > button, .row-4 > button { flex: 1; padding: 12px 4px; font-size: 13px; font-weight: bold; white-space: nowrap; letter-spacing: -0.5px; }
         
@@ -113,21 +114,21 @@
                 <button class="btn-info" onclick="toggleMoveNumbers()">🔢 수순보기</button>
             </div>
             <div class="row-2">
-                <button class="btn-nav" onclick="goPrevMove()" title="왼쪽 방향키">◀</button>
+                <button id="btn-prev-move" class="btn-nav" onclick="goPrevMove()" title="왼쪽 방향키 / S">◀</button>
                 <input type="number" id="move-input" min="0" value="0" onkeydown="handleInputEnter(event)" onblur="jumpToMove()">
-                <button class="btn-nav" onclick="goNextMove()" title="오른쪽 방향키">▶</button>
+                <button id="btn-next-move" class="btn-nav" onclick="goNextMove()" title="오른쪽 방향키 / F">▶</button>
                 <button id="btn-review" class="btn-review" onclick="toggleReviewMode()">🔍 검토</button>
                 <button class="btn-capture" onclick="captureBoard()">📸 캡쳐</button>
             </div>
             <!-- 폴더 내 문제 이동 네비게이션 -->
             <div class="row-3" id="problem-nav">
-                <button class="btn-folder-nav" onclick="prevProblem()">⏮ 이전문제</button>
+                <button id="btn-prev-problem" class="btn-folder-nav" onclick="prevProblem()" title="W / PageUp">⏮ 이전문제</button>
                 <div class="problem-counter-box" id="problem-counter" title="문제 번호를 클릭해서 직접 입력할 수 있습니다.">
                     <input type="number" id="problem-number-input" min="1" value="1" onkeydown="handleProblemInputEnter(event)" onblur="jumpToProblem()">
                     <span>/</span>
                     <span id="problem-total">0</span>
                 </div>
-                <button class="btn-folder-nav" onclick="nextProblem()">다음문제 ⏭</button>
+                <button id="btn-next-problem" class="btn-folder-nav" onclick="nextProblem()" title="R / PageDown">다음문제 ⏭</button>
             </div>
             <!-- 폴더 모드에서만 표시되는 원문 상세풀이 버튼 -->
             <div class="row-4" id="detail-nav">
@@ -578,20 +579,66 @@
         }
     }
 
-    // 키보드 단축키 추가 (이전/다음문제 PageUp/PageDown 포함)
+    // 키보드로 실행했을 때도 버튼이 잠깐 눌린 것처럼 보이게 합니다.
+    function pressButton(buttonId) {
+        const button = document.getElementById(buttonId);
+        if (!button || button.disabled) return;
+
+        button.classList.add('keyboard-active');
+        button.click();
+        window.setTimeout(() => button.classList.remove('keyboard-active'), 120);
+    }
+
+    // 키보드 단축키
+    // 공통: ← 이전 수순, → 다음 수순
+    // 폴더 모드: S 이전 수순, F 다음 수순, D 상세풀이,
+    //            E 검토, W 이전문제, R 다음문제
+    // 기존 PageUp/PageDown 문제 이동 단축키도 유지합니다.
     document.addEventListener('keydown', (e) => {
-        if (document.activeElement.tagName === 'INPUT') return;
-        if (e.key === 'ArrowLeft') goPrevMove();
-        if (e.key === 'ArrowRight') goNextMove();
-        if (isFolderMode) {
-            if (e.key === 'PageDown') {
-                e.preventDefault(); // 스크롤 방지
-                nextProblem();
-            }
-            if (e.key === 'PageUp') {
-                e.preventDefault(); // 스크롤 방지
-                prevProblem();
-            }
+        // 숫자 입력칸에 커서가 있을 때는 단축키가 작동하지 않도록 합니다.
+        const activeElement = document.activeElement;
+        if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable)) {
+            return;
+        }
+
+        // Ctrl/Alt/Command 조합키는 브라우저 기본 단축키와 충돌하지 않도록 제외합니다.
+        if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+        const key = e.key.toLowerCase();
+
+        // 기존 방향키 단축키는 단일 파일/폴더 모드 모두에서 작동합니다.
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            pressButton('btn-prev-move');
+            return;
+        }
+        if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            pressButton('btn-next-move');
+            return;
+        }
+
+        // 아래 단축키는 폴더를 열었을 때만 작동합니다.
+        if (!isFolderMode) return;
+
+        if (key === 's') {
+            e.preventDefault();
+            pressButton('btn-prev-move');       // 왼쪽 화살표
+        } else if (key === 'f') {
+            e.preventDefault();
+            pressButton('btn-next-move');       // 오른쪽 화살표
+        } else if (key === 'd') {
+            e.preventDefault();
+            pressButton('btn-detail');          // 상세풀이
+        } else if (key === 'e') {
+            e.preventDefault();
+            pressButton('btn-review');          // 검토
+        } else if (key === 'w' || e.key === 'PageUp') {
+            e.preventDefault();
+            pressButton('btn-prev-problem');    // 이전문제
+        } else if (key === 'r' || e.key === 'PageDown') {
+            e.preventDefault();
+            pressButton('btn-next-problem');    // 다음문제
         }
     });
 
