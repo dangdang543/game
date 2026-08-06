@@ -114,10 +114,10 @@
                 <button class="btn-info" onclick="toggleMoveNumbers()">🔢 수순보기</button>
             </div>
             <div class="row-2">
-                <button id="btn-prev-move" class="btn-nav" onclick="goPrevMove()" title="왼쪽 방향키 / S">◀</button>
+                <button id="btn-prev-move" class="btn-nav" onclick="goPrevMove()" title="왼쪽 방향키 / S (항상 사용 가능)">◀</button>
                 <input type="number" id="move-input" min="0" value="0" onkeydown="handleInputEnter(event)" onblur="jumpToMove()">
-                <button id="btn-next-move" class="btn-nav" onclick="goNextMove()" title="오른쪽 방향키 / F">▶</button>
-                <button id="btn-review" class="btn-review" onclick="toggleReviewMode()">🔍 검토</button>
+                <button id="btn-next-move" class="btn-nav" onclick="goNextMove()" title="오른쪽 방향키 / F (항상 사용 가능)">▶</button>
+                <button id="btn-review" class="btn-review" onclick="toggleReviewMode()" title="E">🔍 검토</button>
                 <button class="btn-capture" onclick="captureBoard()">📸 캡쳐</button>
             </div>
             <!-- 폴더 내 문제 이동 네비게이션 -->
@@ -589,56 +589,44 @@
         window.setTimeout(() => button.classList.remove('keyboard-active'), 120);
     }
 
-    // 키보드 단축키
-    // 공통: ← 이전 수순, → 다음 수순
-    // 폴더 모드: S 이전 수순, F 다음 수순, D 상세풀이,
-    //            E 검토, W 이전문제, R 다음문제
-    // 기존 PageUp/PageDown 문제 이동 단축키도 유지합니다.
+    // 키보드 단축키 — 폴더를 직접 열었는지, URL로 문제집을 불러왔는지와 관계없이 항상 감지합니다.
+    // S: 이전 수순, F: 다음 수순, D: 상세풀이, E: 검토,
+    // W: 이전문제, R: 다음문제
+    // 기존 ←/→ 및 PageUp/PageDown 단축키도 유지합니다.
     document.addEventListener('keydown', (e) => {
-        // 숫자 입력칸에 커서가 있을 때는 단축키가 작동하지 않도록 합니다.
+        // 숫자 입력칸이나 편집 가능한 요소에 커서가 있을 때는 문자 입력을 방해하지 않습니다.
         const activeElement = document.activeElement;
-        if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable)) {
+        if (activeElement && (
+            activeElement.tagName === 'INPUT' ||
+            activeElement.tagName === 'TEXTAREA' ||
+            activeElement.isContentEditable
+        )) {
             return;
         }
 
-        // Ctrl/Alt/Command 조합키는 브라우저 기본 단축키와 충돌하지 않도록 제외합니다.
+        // 브라우저의 Ctrl/Alt/Command 조합 단축키와 충돌하지 않도록 제외합니다.
         if (e.ctrlKey || e.altKey || e.metaKey) return;
 
         const key = e.key.toLowerCase();
 
-        // 기존 방향키 단축키는 단일 파일/폴더 모드 모두에서 작동합니다.
-        if (e.key === 'ArrowLeft') {
+        if (e.key === 'ArrowLeft' || key === 's') {
             e.preventDefault();
-            pressButton('btn-prev-move');
-            return;
-        }
-        if (e.key === 'ArrowRight') {
+            pressButton('btn-prev-move');       // 왼쪽 화살표와 같은 효과
+        } else if (e.key === 'ArrowRight' || key === 'f') {
             e.preventDefault();
-            pressButton('btn-next-move');
-            return;
-        }
-
-        // 아래 단축키는 폴더를 열었을 때만 작동합니다.
-        if (!isFolderMode) return;
-
-        if (key === 's') {
-            e.preventDefault();
-            pressButton('btn-prev-move');       // 왼쪽 화살표
-        } else if (key === 'f') {
-            e.preventDefault();
-            pressButton('btn-next-move');       // 오른쪽 화살표
+            pressButton('btn-next-move');       // 오른쪽 화살표와 같은 효과
         } else if (key === 'd') {
             e.preventDefault();
-            pressButton('btn-detail');          // 상세풀이
+            pressButton('btn-detail');          // 상세풀이 버튼과 같은 효과
         } else if (key === 'e') {
             e.preventDefault();
-            pressButton('btn-review');          // 검토
-        } else if (key === 'w' || e.key === 'PageUp') {
+            pressButton('btn-review');          // 검토 버튼과 같은 효과
+        } else if (e.key === 'PageUp' || key === 'w') {
             e.preventDefault();
-            pressButton('btn-prev-problem');    // 이전문제
-        } else if (key === 'r' || e.key === 'PageDown') {
+            pressButton('btn-prev-problem');    // 이전문제 버튼과 같은 효과
+        } else if (e.key === 'PageDown' || key === 'r') {
             e.preventDefault();
-            pressButton('btn-next-problem');    // 다음문제
+            pressButton('btn-next-problem');    // 다음문제 버튼과 같은 효과
         }
     });
 
