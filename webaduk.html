@@ -659,16 +659,25 @@
     function extractDetailUrl(content) {
         if (typeof content !== 'string' || !content) return '';
 
+        // 1. "101weiqi problem [숫자]" 패턴 최우선 탐색
+        const problemMatch = content.match(/101weiqi\s+problem\s+(\d+)/i);
+        if (problemMatch && problemMatch[1]) {
+            return `https://www.101weiqi.com/q/${problemMatch[1]}/`;
+        }
+
+        // 2. 문제 넘버가 없다면 일반 URL 탐색
         const normalized = content
             .replace(/\\\r?\n/g, '')
             .replace(/\\:/g, ':')
             .replace(/\\\//g, '/');
 
-        const matches = normalized.match(/https?:\/\/[^\s\]\[<>"']+/gi);
-        if (!matches || matches.length === 0) return '';
+        const urlMatches = normalized.match(/https?:\/\/[^\s\]\[<>"']+/gi);
+        if (urlMatches && urlMatches.length > 0) {
+            return urlMatches[0].replace(/[.,;!?]+$/, ''); // 여러 개일 경우 가장 앞의 URL 반환
+        }
 
-        const preferred = matches.find(url => /(?:www\.)?101weiqi\.com\/q\/\d+/i.test(url)) || matches[0];
-        return preferred.replace(/[.,;!?]+$/, '');
+        // 3. 해당하는 사항이 없다면 빈 문자열 반환
+        return '';
     }
 
     function updateDetailButton() {
