@@ -64,8 +64,8 @@
         .row-3, .row-4 { display: none; } /* 폴더 로드 전에 숨김 */
         /* 카운터 박스 다크 모드 적용 */
         .problem-counter-box { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 14px; font-weight: bold; align-self: center; background: #2d2d2d; padding: 6px 4px; border-radius: 6px; border: 1px solid #444; color: #f3f4f6; }
-        /* 입력창 다크 모드 적용 */
-        #problem-number-input { width: 58px; min-width: 0; padding: 4px 2px; text-align: center; font-size: 14px; font-weight: bold; border: 1px solid #555; border-radius: 5px; outline: none; background: #1f2937; color: #f3f4f6; }
+        /* 입력창 다크 모드 적용 - 텍스트 입력 가능하도록 변경 */
+        #problem-number-input { width: 65px; min-width: 0; padding: 4px 2px; text-align: center; font-size: 14px; font-weight: bold; border: 1px solid #555; border-radius: 5px; outline: none; background: #1f2937; color: #f3f4f6; }
         #problem-number-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,0.3); }
         #problem-total { min-width: 20px; text-align: left; }
 
@@ -87,7 +87,7 @@
             .sidebar { flex: none; max-width: max(300px, calc(100vh - 220px)); }
             .row-1 > button, .row-2 > button, .row-3 > button, .row-4 > button { font-size: 11px; padding: 10px 2px; }
             .problem-counter-box { padding: 6px 2px; font-size: 12px; gap: 2px; }
-            #problem-number-input { width: 46px; font-size: 12px; padding: 3px 1px; }
+            #problem-number-input { width: 55px; font-size: 12px; padding: 3px 1px; }
             #problem-total { min-width: 16px; }
             #move-input { width: 45px; font-size: 13px; }
         }
@@ -129,7 +129,8 @@
             <div class="row-3" id="problem-nav">
                 <button id="btn-prev-problem" class="btn-folder-nav" onclick="prevProblem()" title="W / PageUp">⏮ 이전문제</button>
                 <div class="problem-counter-box" id="problem-counter" title="문제 번호를 클릭해서 직접 입력할 수 있습니다.">
-                    <input type="number" id="problem-number-input" min="1" value="1" onkeydown="handleProblemInputEnter(event)" onblur="jumpToProblem()">
+                    <!-- type="text" 로 변경하여 1-1 형식 입력 가능하도록 함 -->
+                    <input type="text" id="problem-number-input" value="1-1" onkeydown="handleProblemInputEnter(event)" onblur="jumpToProblem()">
                     <span>/</span>
                     <span id="problem-total">0</span>
                 </div>
@@ -373,7 +374,6 @@
         return `${left} ${top} ${finalSide} ${finalSide}`;
     }
 
-    // 폴더 문제의 viewBox 계산: 19줄은 자동 크롭, 그 외 규격은 자르지 않고 전체 바둑판을 보여줌
     function getFolderProblemViewBox(problem) {
         const bSize = problem.boardSize || 19;
         if (bSize !== 19) {
@@ -659,13 +659,11 @@
     function extractDetailUrl(content) {
         if (typeof content !== 'string' || !content) return '';
 
-        // 1. "101weiqi problem [숫자]" 패턴 최우선 탐색
         const problemMatch = content.match(/101weiqi\s+problem\s+(\d+)/i);
         if (problemMatch && problemMatch[1]) {
             return `https://www.101weiqi.com/q/${problemMatch[1]}/`;
         }
 
-        // 2. 문제 넘버가 없다면 일반 URL 탐색
         const normalized = content
             .replace(/\\\r?\n/g, '')
             .replace(/\\:/g, ':')
@@ -673,10 +671,9 @@
 
         const urlMatches = normalized.match(/https?:\/\/[^\s\]\[<>"']+/gi);
         if (urlMatches && urlMatches.length > 0) {
-            return urlMatches[0].replace(/[.,;!?]+$/, ''); // 여러 개일 경우 가장 앞의 URL 반환
+            return urlMatches[0].replace(/[.,;!?]+$/, ''); 
         }
 
-        // 3. 해당하는 사항이 없다면 빈 문자열 반환
         return '';
     }
 
@@ -721,7 +718,7 @@
         }
     }
 
-    function processSgfContent(content, applyToUrl = true) {
+    function processSgfContent(content, applyToUrl = true, fileNameIndex = 1) {
         let boardSize = 19;
         let szMatch = content.match(/SZ\[(\d+)\]/i);
         if (szMatch) {
@@ -839,6 +836,34 @@
         }
         if (lastOp === 'node' && currentPath.length > 0) allPaths.push([...currentPath]);
 
+        if (allPaths.length === 0) allPaths.push([]); 
+
+        let hasSetup = (setupB_str.length > 0 || setupW_str.length > 0);
+
+        let branchesInfo = allPaths.map((path, idx) => {
+            let movesHash = "";
+            path.forEach(node => {
+                let moveMatch = [...node.matchAll(/[BW]\[([a-zA-Z]{2})\]/gi)];
+                moveMatch.forEach(m => {
+                    movesHash += transformStr(m[1].toLowerCase());
+                });
+            });
+            let newHash = "";
+            if (hasSetup) {
+                if (setupB_str) newHash += "B" + setupB_str;
+                if (setupW_str) newHash += "W" + setupW_str;
+                newHash += "_" + movesHash;
+            } else {
+                newHash = movesHash;
+            }
+            return {
+                hash: newHash,
+                isProblem: isProblem,
+                boardSize: boardSize,
+                branchLabel: `${fileNameIndex}-${idx + 1}`
+            };
+        });
+
         let correctPaths = allPaths.filter(path => {
             if(path.length === 0) return false;
             let lastNode = path[path.length - 1];
@@ -853,32 +878,36 @@
         let targetPaths = correctPaths.length > 0 ? correctPaths : allPaths;
         let bestPath = targetPaths.length > 0 ? targetPaths[0] : [];
 
-        let movesHash = "";
+        let bestMovesHash = "";
         bestPath.forEach(node => {
             let moveMatch = [...node.matchAll(/[BW]\[([a-zA-Z]{2})\]/gi)];
             moveMatch.forEach(m => {
-                movesHash += transformStr(m[1].toLowerCase());
+                bestMovesHash += transformStr(m[1].toLowerCase());
             });
         });
 
-        let hasSetup = (setupB_str.length > 0 || setupW_str.length > 0);
-        let newHash = "";
+        let bestHash = "";
         if (hasSetup) {
-            if (setupB_str) newHash += "B" + setupB_str;
-            if (setupW_str) newHash += "W" + setupW_str;
-            newHash += "_" + movesHash;
+            if (setupB_str) bestHash += "B" + setupB_str;
+            if (setupW_str) bestHash += "W" + setupW_str;
+            bestHash += "_" + bestMovesHash;
         } else {
-            newHash = movesHash;
+            bestHash = bestMovesHash;
         }
 
         if (applyToUrl) {
             isFolderMode = false;
             window.isSgfFileLoading = true;
             window.loadedSgfIsProblem = isProblem;
-            window.location.hash = newHash;
+            window.location.hash = bestHash;
         }
 
-        return { hash: newHash, isProblem, boardSize };
+        return { 
+            hash: bestHash, 
+            isProblem: isProblem, 
+            boardSize: boardSize, 
+            branches: branchesInfo 
+        };
     }
 
     function encodeFolderPayload(data) {
@@ -908,15 +937,35 @@
                 hash: problem.hash,
                 isProblem: !!problem.isProblem,
                 boardSize: problem.boardSize || 19,
-                detailUrl: problem.detailUrl || ''
+                detailUrl: problem.detailUrl || '',
+                branchLabel: problem.branchLabel || ''
             }))
         };
         return FOLDER_URL_PREFIX + encodeFolderPayload(payload);
     }
 
+    // 분모(전체 수)를 "전체 문제(파일) 개수"로 표시하도록 로직 수정
     function updateProblemCounter() {
-        document.getElementById('problem-number-input').value = folderProblems.length > 0 ? currentFileIndex + 1 : 0;
-        document.getElementById('problem-total').innerText = folderProblems.length;
+        let totalProblems = 0;
+        if (folderProblems.length > 0) {
+            let uniqueProblems = new Set();
+            folderProblems.forEach((p, idx) => {
+                if (p.branchLabel && p.branchLabel.includes('-')) {
+                    uniqueProblems.add(p.branchLabel.split('-')[0]);
+                } else {
+                    uniqueProblems.add(p.branchLabel || `unknown_${idx}`);
+                }
+            });
+            totalProblems = uniqueProblems.size;
+
+            if (folderProblems[currentFileIndex]) {
+                document.getElementById('problem-number-input').value = folderProblems[currentFileIndex].branchLabel || (currentFileIndex + 1);
+            }
+        } else {
+            document.getElementById('problem-number-input').value = "0";
+        }
+        
+        document.getElementById('problem-total').innerText = totalProblems;
         updateDetailButton();
     }
 
@@ -961,16 +1010,27 @@
 
         try {
             const contents = await Promise.all(files.map(readFileAsText));
-            folderProblems = contents.map((content, index) => {
-                const result = processSgfContent(content, false);
-                return {
-                    name: files[index].name,
-                    hash: result.hash,
-                    isProblem: result.isProblem,
-                    boardSize: result.boardSize || 19,
-                    detailUrl: extractDetailUrl(content)
-                };
+            folderProblems = [];
+            
+            contents.forEach((content, index) => {
+                const fileIndex = index + 1; // 문제 식별 번호 (1부터 시작)
+                const result = processSgfContent(content, false, fileIndex);
+                const detailUrl = extractDetailUrl(content);
+                const nameBase = files[index].name;
+
+                result.branches.forEach(branch => {
+                    folderProblems.push({
+                        name: `${nameBase} (Branch ${branch.branchLabel})`,
+                        hash: branch.hash,
+                        isProblem: branch.isProblem,
+                        boardSize: branch.boardSize,
+                        detailUrl: detailUrl,
+                        branchLabel: branch.branchLabel
+                    });
+                });
             });
+
+            if (folderProblems.length === 0) throw new Error('변환할 수 있는 문제가 없습니다.');
 
             isFolderMode = true;
             currentFileIndex = 0;
@@ -1038,10 +1098,21 @@
     function jumpToProblem() {
         if (!isFolderMode || folderProblems.length === 0) return;
 
-        let target = parseInt(document.getElementById('problem-number-input').value, 10);
-        if (isNaN(target)) target = currentFileIndex + 1;
-        target = Math.max(1, Math.min(folderProblems.length, target));
-        loadSgfFromFileList(target - 1);
+        let targetValue = document.getElementById('problem-number-input').value.trim();
+        
+        let foundIndex = folderProblems.findIndex(p => p.branchLabel === targetValue);
+        
+        if (foundIndex !== -1) {
+            loadSgfFromFileList(foundIndex);
+        } else {
+            let targetNum = parseInt(targetValue, 10);
+            if (!isNaN(targetNum)) {
+                let target = Math.max(1, Math.min(folderProblems.length, targetNum));
+                loadSgfFromFileList(target - 1);
+            } else {
+                updateProblemCounter();
+            }
+        }
     }
 
     function loadFolderFromUrl() {
@@ -1056,12 +1127,13 @@
 
             folderProblems = payload.files
                 .filter(item => item && typeof item.hash === 'string')
-                .map(item => ({
+                .map((item, index) => ({
                     name: item.name || '문제',
                     hash: item.hash,
                     isProblem: !!item.isProblem,
                     boardSize: typeof item.boardSize === 'number' ? item.boardSize : 19,
-                    detailUrl: typeof item.detailUrl === 'string' ? item.detailUrl : ''
+                    detailUrl: typeof item.detailUrl === 'string' ? item.detailUrl : '',
+                    branchLabel: typeof item.branchLabel === 'string' && item.branchLabel ? item.branchLabel : (index + 1).toString()
                 }));
 
             if (folderProblems.length === 0) throw new Error('유효한 문제 데이터가 없습니다.');
@@ -1120,7 +1192,10 @@
     }
 
     function copyLink() {
-        const url = window.location.href;
+        const baseUrl = "https://dangdang543.github.io/game/webaduk.html";
+        const hash = window.location.hash;
+        const url = baseUrl + hash;
+
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(url).then(() => alert("🔗 링크가 복사되었습니다!"));
         } else {
