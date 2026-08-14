@@ -56,18 +56,18 @@
         .btn-capture { background-color: #be185d; color: white; flex: 1.5 !important; }
         .btn-review.active { background-color: #dc2626; animation: pulse 1.5s infinite; }
 
-        .btn-folder-nav { background-color: #374151; color: white; font-size: 13px !important; flex: 1 !important; }
+        .btn-folder-nav { background-color: #374151; color: white; font-size: 11px !important; flex: 1 !important; padding: 10px 2px !important; letter-spacing: -0.5px; }
         .btn-detail { background-color: #0f766e; color: white; font-size: 14px !important; }
         .btn-detail:disabled { background-color: #4b5563; color: #9ca3af; cursor: not-allowed; opacity: 0.75; }
         .btn-detail:disabled:active { transform: none; }
         
         .row-3, .row-4 { display: none; } /* 폴더 로드 전에 숨김 */
         /* 카운터 박스 다크 모드 적용 */
-        .problem-counter-box { flex: 1; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 14px; font-weight: bold; align-self: center; background: #2d2d2d; padding: 6px 4px; border-radius: 6px; border: 1px solid #444; color: #f3f4f6; }
+        .problem-counter-box { flex: 1.2; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: bold; align-self: stretch; background: #2d2d2d; border-radius: 6px; border: 1px solid #444; color: #f3f4f6; }
         /* 입력창 다크 모드 적용 - 텍스트 입력 가능하도록 변경 */
-        #problem-number-input { width: 65px; min-width: 0; padding: 4px 2px; text-align: center; font-size: 14px; font-weight: bold; border: 1px solid #555; border-radius: 5px; outline: none; background: #1f2937; color: #f3f4f6; }
+        #problem-number-input { width: 45px; min-width: 0; padding: 4px 2px; text-align: center; font-size: 13px; font-weight: bold; border: 1px solid #555; border-radius: 5px; outline: none; background: #1f2937; color: #f3f4f6; }
         #problem-number-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,0.3); }
-        #problem-total { min-width: 20px; text-align: left; }
+        #problem-total { min-width: 16px; text-align: left; }
 
         /* 수순 입력창 다크 모드 적용 */
         #move-input { width: 55px; flex-shrink: 0; text-align: center; font-size: 15px; font-weight: bold; border: 2px solid #555; border-radius: 6px; outline: none; background: #1f2937; color: #f3f4f6; }
@@ -85,9 +85,10 @@
             .container { flex-direction: column; align-items: center; padding: 10px; border-radius: 0; box-shadow: none; gap: 15px; background: transparent; }
             #board-container { border-left: none; border-right: none; border-radius: 0; max-width: 100vw; flex: none; }
             .sidebar { flex: none; max-width: max(300px, calc(100vh - 220px)); }
-            .row-1 > button, .row-2 > button, .row-3 > button, .row-4 > button { font-size: 11px; padding: 10px 2px; }
-            .problem-counter-box { padding: 6px 2px; font-size: 12px; gap: 2px; }
-            #problem-number-input { width: 55px; font-size: 12px; padding: 3px 1px; }
+            .row-1 > button, .row-2 > button, .row-3 > button, .row-4 > button { font-size: 11px; padding: 8px 1px; }
+            .btn-folder-nav { font-size: 10px !important; padding: 8px 1px !important; letter-spacing: -1px; }
+            .problem-counter-box { padding: 4px 1px; font-size: 11px; flex: 1.2; }
+            #problem-number-input { width: 40px; font-size: 11px; padding: 2px 1px; }
             #problem-total { min-width: 16px; }
             #move-input { width: 45px; font-size: 13px; }
         }
@@ -125,16 +126,17 @@
                 <button id="btn-review" class="btn-review" onclick="toggleReviewMode()" title="E">🔍 검토</button>
                 <button class="btn-capture" onclick="captureBoard()">📸 캡쳐</button>
             </div>
-            <!-- 폴더 내 문제 이동 네비게이션 -->
+            <!-- 폴더 내 문제 이동 네비게이션 (버튼 4개로 확장) -->
             <div class="row-3" id="problem-nav">
-                <button id="btn-prev-problem" class="btn-folder-nav" onclick="prevProblem()" title="W / PageUp">⏮ 이전문제</button>
+                <button id="btn-prev-problem" class="btn-folder-nav" onclick="prevProblem()" title="Shift+W / Shift+PageUp">⏮ 이전문제</button>
+                <button id="btn-prev-scene" class="btn-folder-nav" onclick="prevScene()" title="W / PageUp">◀ 이전장면</button>
                 <div class="problem-counter-box" id="problem-counter" title="문제 번호를 클릭해서 직접 입력할 수 있습니다.">
-                    <!-- type="text" 로 변경하여 1-1 형식 입력 가능하도록 함 -->
                     <input type="text" id="problem-number-input" value="1-1" onkeydown="handleProblemInputEnter(event)" onblur="jumpToProblem()">
                     <span>/</span>
                     <span id="problem-total">0</span>
                 </div>
-                <button id="btn-next-problem" class="btn-folder-nav" onclick="nextProblem()" title="R / PageDown">다음문제 ⏭</button>
+                <button id="btn-next-scene" class="btn-folder-nav" onclick="nextScene()" title="R / PageDown">다음장면 ▶</button>
+                <button id="btn-next-problem" class="btn-folder-nav" onclick="nextProblem()" title="Shift+R / Shift+PageDown">다음문제 ⏭</button>
             </div>
             <!-- 폴더 모드에서만 표시되는 원문 상세풀이 버튼 -->
             <div class="row-4" id="detail-nav">
@@ -594,6 +596,7 @@
         window.setTimeout(() => button.classList.remove('keyboard-active'), 120);
     }
 
+    // 단축키 로직 업데이트 (장면 및 문제 이동 구분)
     document.addEventListener('keydown', (e) => {
         const activeElement = document.activeElement;
         if (activeElement && (
@@ -622,10 +625,18 @@
             pressButton('btn-review');
         } else if (e.key === 'PageUp' || key === 'w') {
             e.preventDefault();
-            pressButton('btn-prev-problem');
+            if (e.shiftKey) {
+                pressButton('btn-prev-problem');
+            } else {
+                pressButton('btn-prev-scene');
+            }
         } else if (e.key === 'PageDown' || key === 'r') {
             e.preventDefault();
-            pressButton('btn-next-problem');
+            if (e.shiftKey) {
+                pressButton('btn-next-problem');
+            } else {
+                pressButton('btn-next-scene');
+            }
         }
     });
 
@@ -944,7 +955,6 @@
         return FOLDER_URL_PREFIX + encodeFolderPayload(payload);
     }
 
-    // 분모(전체 수)를 "전체 문제(파일) 개수"로 표시하도록 로직 수정
     function updateProblemCounter() {
         let totalProblems = 0;
         if (folderProblems.length > 0) {
@@ -969,120 +979,55 @@
         updateDetailButton();
     }
 
-    function loadSGFFile(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        isFolderMode = false;
-        folderProblems = [];
-        currentFileIndex = -1;
-        currentFolderHash = '';
-        currentFolderViewBox = '0 0 400 400';
-        document.getElementById('problem-nav').style.display = 'none';
-        document.getElementById('detail-nav').style.display = 'none';
-
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            processSgfContent(e.target.result, true);
-            event.target.value = '';
-        };
-        reader.readAsText(file);
-    }
-
-    function readFileAsText(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = () => reject(reader.error || new Error('파일을 읽지 못했습니다.'));
-            reader.readAsText(file);
-        });
-    }
-
-    async function loadSGFFolder(event) {
-        const files = Array.from(event.target.files || [])
-            .filter(file => file.name.toLowerCase().endsWith('.sgf'))
-            .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-
-        if (files.length === 0) {
-            alert('폴더 내에 SGF 파일이 없습니다.');
-            return;
-        }
-
-        try {
-            const contents = await Promise.all(files.map(readFileAsText));
-            folderProblems = [];
-            
-            contents.forEach((content, index) => {
-                const fileIndex = index + 1; // 문제 식별 번호 (1부터 시작)
-                const result = processSgfContent(content, false, fileIndex);
-                const detailUrl = extractDetailUrl(content);
-                const nameBase = files[index].name;
-
-                result.branches.forEach(branch => {
-                    folderProblems.push({
-                        name: `${nameBase} (Branch ${branch.branchLabel})`,
-                        hash: branch.hash,
-                        isProblem: branch.isProblem,
-                        boardSize: branch.boardSize,
-                        detailUrl: detailUrl,
-                        branchLabel: branch.branchLabel
-                    });
-                });
-            });
-
-            if (folderProblems.length === 0) throw new Error('변환할 수 있는 문제가 없습니다.');
-
-            isFolderMode = true;
-            currentFileIndex = 0;
-            currentFolderHash = folderProblems[0].hash;
-            currentFolderViewBox = getFolderProblemViewBox(folderProblems[0]);
-            currentMoveIndex = folderProblems[0].isProblem ? 0 : parseHashData(currentFolderHash).moves.length / 2;
-            isReviewMode = false;
-            savedReviewState = null;
-
-            const folderHash = getFolderUrlHash();
-            history.replaceState(null, '', window.location.href.split('#')[0] + '#' + folderHash);
-
-            document.getElementById('problem-nav').style.display = 'flex';
-            updateProblemCounter();
-            render();
-            event.target.value = '';
-        } catch (error) {
-            console.error(error);
-            alert('폴더의 SGF 파일을 읽는 중 오류가 발생했습니다.');
+    // 장면(Branch) 이동 함수
+    function prevScene() {
+        if (!isFolderMode || folderProblems.length === 0) return;
+        if (currentFileIndex > 0) {
+            loadSgfFromFileList(currentFileIndex - 1);
+        } else {
+            alert("첫 번째 장면입니다.");
         }
     }
 
-    function loadSgfFromFileList(index) {
-        if (index < 0 || index >= folderProblems.length) return;
+    function nextScene() {
+        if (!isFolderMode || folderProblems.length === 0) return;
+        if (currentFileIndex < folderProblems.length - 1) {
+            loadSgfFromFileList(currentFileIndex + 1);
+        } else {
+            alert("마지막 장면입니다.");
+        }
+    }
 
-        currentFileIndex = index;
-        const problem = folderProblems[index];
-        currentFolderHash = problem.hash;
-        currentFolderViewBox = getFolderProblemViewBox(problem);
-        currentMoveIndex = problem.isProblem ? 0 : parseHashData(currentFolderHash).moves.length / 2;
-        isReviewMode = false;
-        savedReviewState = null;
-
-        updateProblemCounter();
-        render();
+    // 문제(File) 단위 이동 함수
+    function getFileNum(branchLabel) {
+        if (!branchLabel) return 1;
+        let parts = branchLabel.split('-');
+        return parseInt(parts[0], 10);
     }
 
     function prevProblem() {
         if (!isFolderMode || folderProblems.length === 0) return;
+        let currentFileNum = getFileNum(folderProblems[currentFileIndex].branchLabel);
+        let targetFileNum = currentFileNum - 1;
 
-        if (currentFileIndex > 0) {
-            loadSgfFromFileList(currentFileIndex - 1);
-        } else {
-            alert("첫 번째 문제입니다.");
+        if (targetFileNum > 0) {
+            let targetIndex = folderProblems.findIndex(p => getFileNum(p.branchLabel) === targetFileNum);
+            if (targetIndex !== -1) {
+                loadSgfFromFileList(targetIndex);
+                return;
+            }
         }
+        alert("첫 번째 문제입니다.");
     }
 
     function nextProblem() {
         if (!isFolderMode || folderProblems.length === 0) return;
+        let currentFileNum = getFileNum(folderProblems[currentFileIndex].branchLabel);
+        let targetFileNum = currentFileNum + 1;
 
-        if (currentFileIndex < folderProblems.length - 1) {
-            loadSgfFromFileList(currentFileIndex + 1);
+        let targetIndex = folderProblems.findIndex(p => getFileNum(p.branchLabel) === targetFileNum);
+        if (targetIndex !== -1) {
+            loadSgfFromFileList(targetIndex);
         } else {
             alert("마지막 문제입니다.");
         }
@@ -1090,21 +1035,27 @@
 
     function handleProblemInputEnter(e) {
         if (e.key === 'Enter') {
-            e.preventDefault();
             document.getElementById('problem-number-input').blur();
         }
     }
 
+    // 문제 번호 이동 (숫자만 입력시 "-1" 장면으로 이동 로직 추가)
     function jumpToProblem() {
         if (!isFolderMode || folderProblems.length === 0) return;
 
         let targetValue = document.getElementById('problem-number-input').value.trim();
         
+        // "-" 기호 없이 숫자만 입력된 경우, 해당 숫자의 첫번째 장면(예: "2-1")으로 변환
+        if (/^\d+$/.test(targetValue)) {
+            targetValue += "-1";
+        }
+
         let foundIndex = folderProblems.findIndex(p => p.branchLabel === targetValue);
         
         if (foundIndex !== -1) {
             loadSgfFromFileList(foundIndex);
         } else {
+            // 라벨에서 못 찾은 경우 기존의 인덱스 번호 접근법을 폴백(Fallback)으로 유지
             let targetNum = parseInt(targetValue, 10);
             if (!isNaN(targetNum)) {
                 let target = Math.max(1, Math.min(folderProblems.length, targetNum));
@@ -1115,112 +1066,184 @@
         }
     }
 
+    function loadSgfFromFileList(index) {
+        if (index < 0 || index >= folderProblems.length) return;
+        currentFileIndex = index;
+        const problem = folderProblems[currentFileIndex];
+        currentFolderHash = problem.hash;
+        currentFolderViewBox = getFolderProblemViewBox(problem);
+        
+        if (problem.isProblem) {
+            currentMoveIndex = 0;
+        } else {
+            let { moves } = parseHashData(currentFolderHash);
+            currentMoveIndex = moves.length / 2;
+        }
+        
+        isReviewMode = false;
+        let btnReview = document.getElementById('btn-review');
+        btnReview.classList.remove('active');
+        btnReview.innerText = '🔍 검토';
+        savedReviewState = null;
+
+        updateProblemCounter();
+        
+        const newUrlHash = getFolderUrlHash();
+        history.replaceState(null, null, '#' + newUrlHash);
+        
+        render();
+    }
+
     function loadFolderFromUrl() {
-        const rawHash = window.location.hash.substring(1);
-        if (!rawHash.startsWith(FOLDER_URL_PREFIX)) return false;
-
-        try {
-            const payload = decodeFolderPayload(rawHash.substring(FOLDER_URL_PREFIX.length));
-            if (!payload || !Array.isArray(payload.files) || payload.files.length === 0) {
-                throw new Error('폴더 데이터가 비어 있습니다.');
+        const hash = window.location.hash.substring(1);
+        if (hash.startsWith(FOLDER_URL_PREFIX)) {
+            try {
+                const encoded = hash.substring(FOLDER_URL_PREFIX.length);
+                const payload = decodeFolderPayload(encoded);
+                
+                if (payload.version === 1 && Array.isArray(payload.files)) {
+                    folderProblems = payload.files;
+                    isFolderMode = true;
+                    document.getElementById('problem-nav').style.display = 'flex';
+                    document.getElementById('detail-nav').style.display = 'flex';
+                    loadSgfFromFileList(0);
+                    return true;
+                }
+            } catch (e) {
+                console.error("폴더 URL 파싱 실패:", e);
+                isFolderMode = false;
             }
+        }
+        return false;
+    }
 
-            folderProblems = payload.files
-                .filter(item => item && typeof item.hash === 'string')
-                .map((item, index) => ({
-                    name: item.name || '문제',
-                    hash: item.hash,
-                    isProblem: !!item.isProblem,
-                    boardSize: typeof item.boardSize === 'number' ? item.boardSize : 19,
-                    detailUrl: typeof item.detailUrl === 'string' ? item.detailUrl : '',
-                    branchLabel: typeof item.branchLabel === 'string' && item.branchLabel ? item.branchLabel : (index + 1).toString()
-                }));
+    function loadSGFFolder(event) {
+        const files = Array.from(event.target.files).filter(file => file.name.toLowerCase().endsWith('.sgf'));
+        if (files.length === 0) {
+            alert("선택된 폴더에 SGF 파일이 없습니다.");
+            return;
+        }
+        
+        files.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
+        folderProblems = [];
+        let filesProcessed = 0;
+        let totalFiles = files.length;
+        
+        let fileContents = new Array(totalFiles);
 
-            if (folderProblems.length === 0) throw new Error('유효한 문제 데이터가 없습니다.');
+        files.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                fileContents[index] = e.target.result;
+                filesProcessed++;
+                if (filesProcessed === totalFiles) {
+                    processAllFiles(fileContents);
+                }
+            };
+            reader.readAsText(file);
+        });
+        
+        event.target.value = '';
+    }
 
+    function processAllFiles(contents) {
+        folderProblems = [];
+        contents.forEach((content, index) => {
+            const fileIndex = index + 1;
+            const detailUrl = extractDetailUrl(content);
+            const result = processSgfContent(content, false, fileIndex);
+            
+            result.branches.forEach(branch => {
+                folderProblems.push({
+                    name: `file_${fileIndex}_${branch.branchLabel}`,
+                    hash: branch.hash,
+                    isProblem: branch.isProblem,
+                    boardSize: branch.boardSize,
+                    detailUrl: detailUrl,
+                    branchLabel: branch.branchLabel
+                });
+            });
+        });
+
+        if (folderProblems.length > 0) {
             isFolderMode = true;
-            currentFileIndex = 0;
-            currentFolderHash = folderProblems[0].hash;
-            currentFolderViewBox = getFolderProblemViewBox(folderProblems[0]);
-            currentMoveIndex = folderProblems[0].isProblem ? 0 : parseHashData(currentFolderHash).moves.length / 2;
-            isReviewMode = false;
-            savedReviewState = null;
-
             document.getElementById('problem-nav').style.display = 'flex';
-            updateProblemCounter();
-            return true;
-        } catch (error) {
-            console.error('폴더 URL 복원 실패:', error);
-            alert('폴더 URL 데이터를 불러오지 못했습니다.');
-            return false;
+            document.getElementById('detail-nav').style.display = 'flex';
+            
+            const newUrlHash = getFolderUrlHash();
+            history.pushState(null, null, '#' + newUrlHash);
+            
+            loadSgfFromFileList(0);
+        } else {
+            alert("유효한 SGF 기보를 찾을 수 없습니다.");
         }
     }
 
-    function downloadSGF() {
-        let hash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
-        if (!hash) { alert("저장할 기보가 없습니다!"); return; }
-
-        let activeProblem = (isFolderMode && folderProblems[currentFileIndex]) ? folderProblems[currentFileIndex] : null;
-        let bSize = activeProblem ? (activeProblem.boardSize || 19) : 19;
-
-        let { setupB, setupW, moves } = parseHashData(hash);
-        let sgfContent = `(;GM[1]FF[4]SZ[${bSize}]AP[BadukWeb:3.0]DT[` + new Date().toISOString().slice(0,10) + "]";
-        
-        if (setupB) {
-            sgfContent += "AB";
-            for(let i=0; i<setupB.length; i+=2) sgfContent += `[${setupB[i]}${setupB[i+1]}]`;
-        }
-        if (setupW) {
-            sgfContent += "AW";
-            for(let i=0; i<setupW.length; i+=2) sgfContent += `[${setupW[i]}${setupW[i+1]}]`;
-        }
-
-        for (let i = 0; i < moves.length; i += 2) {
-            let x = moves[i], y = moves[i+1];
-            let color = (i/2 % 2 === 0) ? 'B' : 'W';
-            sgfContent += `;${color}[${x}${y}]`;
-        }
-        sgfContent += ")";
-
-        const blob = new Blob([sgfContent], { type: 'application/x-go-sgf' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = "baduk_game.sgf";
-        a.click();
-        URL.revokeObjectURL(url);
+    function loadSGFFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const content = e.target.result;
+            processSgfContent(content, true);
+        };
+        reader.readAsText(file);
+        event.target.value = ''; 
     }
 
     function copyLink() {
-        const baseUrl = "https://dangdang543.github.io/game/webaduk.html";
-        const hash = window.location.hash;
-        const url = baseUrl + hash;
-
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(url).then(() => alert("🔗 링크가 복사되었습니다!"));
-        } else {
-            const textarea = document.createElement('textarea');
-            textarea.value = url;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-            alert("🔗 링크가 복사되었습니다!");
-        }
+        const url = window.location.href;
+        navigator.clipboard.writeText(url).then(() => {
+            alert('링크가 클립보드에 복사되었습니다.');
+        }).catch(err => {
+            console.error('복사 실패:', err);
+            alert('링크 복사에 실패했습니다.');
+        });
     }
 
-    drawBoardGrid(19);
-    const loadedFolderFromUrl = loadFolderFromUrl();
-    if (!loadedFolderFromUrl) {
-        let initialHash = window.location.hash.substring(1);
-        if(initialHash) {
-            let { setupB, setupW, moves } = parseHashData(initialHash);
-            if (setupB || setupW) currentMoveIndex = 0;
-            else currentMoveIndex = moves.length / 2;
+    function downloadSGF() {
+        let bSize = currentBoardSizeRendered > 0 ? currentBoardSizeRendered : 19;
+        let sgfContent = `(;GM[1]FF[4]SZ[${bSize}]`;
+        let activeHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
+        let { setupB, setupW, moves } = parseHashData(activeHash);
+
+        if (setupB.length > 0) {
+            sgfContent += "AB";
+            for (let i = 0; i < setupB.length; i += 2) sgfContent += `[${setupB.slice(i, i+2)}]`;
         }
+        if (setupW.length > 0) {
+            sgfContent += "AW";
+            for (let i = 0; i < setupW.length; i += 2) sgfContent += `[${setupW.slice(i, i+2)}]`;
+        }
+        
+        for (let i = 0; i < moves.length; i += 2) {
+            let color = (i / 2 % 2 === 0) ? 'B' : 'W';
+            sgfContent += `;${color}[${moves.slice(i, i+2)}]`;
+        }
+        sgfContent += ")";
+        
+        const blob = new Blob([sgfContent], { type: 'application/x-go-sgf' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        let timestamp = new Date().toISOString().slice(0,19).replace(/[:-]/g, "").replace("T", "_");
+        a.download = `baduk_${timestamp}.sgf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     }
-    render();
+
+    window.onload = () => {
+        if (!loadFolderFromUrl()) {
+            if (window.location.hash) {
+                let currentHash = window.location.hash.substring(1);
+                let { moves } = parseHashData(currentHash);
+                currentMoveIndex = moves.length / 2;
+                render();
+            } else {
+                render();
+            }
+        }
+    };
 </script>
-
 </body>
 </html>
