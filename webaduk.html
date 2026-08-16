@@ -16,11 +16,10 @@
             width: 100%; max-width: 1200px; gap: 30px;
         }
         
-        /* 바둑판 영역: 타이젬 스타일의 입체적인 나무 배경과 그림자 적용 */
+        /* 바둑판 영역: 눈이 편안한 톤다운 단색 배경 적용 */
         #board-container { 
             position: relative; aspect-ratio: 1 / 1; 
-            /* 입체감을 위한 방사형 그라데이션 (가운데는 밝고 모서리는 어둡게) */
-            background: radial-gradient(circle at center, #ebb866 0%, #cc9036 80%, #9e6b21 100%);
+            background-color: #9e7646; /* 균일하고 톤다운된 나무색상 */
             border: 5px solid #523114; /* 실제 바둑판 테두리 같은 짙은 나무색 */
             box-shadow: 0 15px 30px rgba(0,0,0,0.6), inset 0 0 25px rgba(0,0,0,0.3); /* 깊이감 있는 외부/내부 그림자 */
             cursor: pointer; border-radius: 6px; -webkit-user-select: none; user-select: none;
@@ -111,7 +110,6 @@
         </div>
 
         <input type="file" id="sgf-file-input" accept=".sgf" style="display: none;" onchange="loadSGFFile(event)">
-        <!-- 폴더 업로드용 인풋 추가 -->
         <input type="file" id="sgf-folder-input" webkitdirectory directory multiple style="display: none;" onchange="loadSGFFolder(event)">
 
         <div class="controls-container">
@@ -129,7 +127,7 @@
                 <button id="btn-review" class="btn-review" onclick="toggleReviewMode()" title="E">🔍 검토</button>
                 <button class="btn-capture" onclick="captureBoard()">📸 캡쳐</button>
             </div>
-            <!-- 폴더 내 문제 이동 네비게이션 (버튼 4개로 확장) -->
+            <!-- 폴더 내 문제 이동 네비게이션 -->
             <div class="row-3" id="problem-nav">
                 <button id="btn-prev-problem" class="btn-folder-nav" onclick="prevProblem()" title="Shift+W / Shift+PageUp">⏮ 이전문제</button>
                 <button id="btn-prev-scene" class="btn-folder-nav" onclick="prevScene()" title="W / PageUp">◀ 이전장면</button>
@@ -195,7 +193,7 @@
         let maxPos = pad + (bSize - 1) * step;
         for(let i = 0; i < bSize; i++) {
             let pos = pad + i * step;
-            // 줄 색상을 자연스러운 짙은 흑갈색으로 변경
+            // 줄 색상을 자연스러운 짙은 흑갈색으로 유지
             html += `<line x1="${pad}" y1="${pos}" x2="${maxPos}" y2="${pos}" stroke="#331e0b" stroke-width="0.8"/>`;
             html += `<line x1="${pos}" y1="${pad}" x2="${pos}" y2="${maxPos}" stroke="#331e0b" stroke-width="0.8"/>`;
         }
@@ -214,7 +212,6 @@
             if (bSize % 2 === 1) stars.push([mid, mid]);
         }
         stars.forEach(([cx, cy]) => {
-            // 화점 색상도 줄 색상과 어울리게 변경
             html += `<circle cx="${pad + cx * step}" cy="${pad + cy * step}" r="2.5" fill="#221105"/>`;
         });
         html += `</g><g id="stones"></g>`;
@@ -432,20 +429,16 @@
                     let isLast = (x === lastX && y === lastY);
                     
                     if (stone.color === 'B') {
-                        // 흑돌: 정의해둔 입체 그라데이션과 그림자 적용, 테두리 선(stroke) 제거
                         html += `<circle cx="${cx}" cy="${cy}" r="9.3" fill="url(#grad-black)" filter="url(#stone-shadow)"/>`;
                     } else {
-                        // 백돌: 정의해둔 입체 그라데이션과 그림자 적용, 테두리 선(stroke) 제거
                         html += `<circle cx="${cx}" cy="${cy}" r="9.3" fill="url(#grad-white)" filter="url(#stone-shadow)"/>`;
                     }
 
                     if (showMoveNumbers && stone.moveNum > 0) {
                         let textColor = stone.color === 'B' ? 'white' : 'black';
                         let fontSize = stone.moveNum >= 100 ? 9 : 10;
-                        // 폰트에 약간의 그림자를 주어 돌 위에서 더 잘 보이도록 수정
                         html += `<text x="${cx}" y="${cy}" fill="${textColor}" font-size="${fontSize}" text-anchor="middle" dominant-baseline="central" font-family="Arial, sans-serif" style="text-shadow: 0px 1px 2px rgba(0,0,0,0.4);">${stone.moveNum}</text>`;
                     } else if (isLast && !showMoveNumbers) {
-                        // 마지막 수 표시를 타이젬처럼 선명하게(투명도 조정)
                         let markerColor = stone.color === 'B' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.7)';
                         html += `<circle cx="${cx}" cy="${cy}" r="2.5" fill="${markerColor}"/>`;
                     }
@@ -623,7 +616,6 @@
         window.setTimeout(() => button.classList.remove('keyboard-active'), 120);
     }
 
-    // 단축키 로직 업데이트 (장면 및 문제 이동 구분)
     document.addEventListener('keydown', (e) => {
         const activeElement = document.activeElement;
         if (activeElement && (
@@ -676,8 +668,9 @@
         const canvas = document.createElement('canvas');
         canvas.width = size; canvas.height = size;
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#e6b873'; ctx.fillRect(0, 0, size, size);
-        ctx.strokeStyle = '#b38644'; ctx.lineWidth = 12; ctx.strokeRect(0, 0, size, size);
+        // 변경된 바둑판 단색 컬러와 동일하게 캡쳐 배경색 설정
+        ctx.fillStyle = '#9e7646'; ctx.fillRect(0, 0, size, size);
+        ctx.strokeStyle = '#523114'; ctx.lineWidth = 12; ctx.strokeRect(0, 0, size, size);
 
         const img = new Image();
         const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -1006,7 +999,6 @@
         updateDetailButton();
     }
 
-    // 장면(Branch) 이동 함수
     function prevScene() {
         if (!isFolderMode || folderProblems.length === 0) return;
         if (currentFileIndex > 0) {
@@ -1025,7 +1017,6 @@
         }
     }
 
-    // 문제(File) 단위 이동 함수
     function getFileNum(branchLabel) {
         if (!branchLabel) return 1;
         let parts = branchLabel.split('-');
@@ -1066,13 +1057,11 @@
         }
     }
 
-    // 문제 번호 이동 (숫자만 입력시 "-1" 장면으로 이동 로직 추가)
     function jumpToProblem() {
         if (!isFolderMode || folderProblems.length === 0) return;
 
         let targetValue = document.getElementById('problem-number-input').value.trim();
         
-        // "-" 기호 없이 숫자만 입력된 경우, 해당 숫자의 첫번째 장면(예: "2-1")으로 변환
         if (/^\d+$/.test(targetValue)) {
             targetValue += "-1";
         }
@@ -1082,7 +1071,6 @@
         if (foundIndex !== -1) {
             loadSgfFromFileList(foundIndex);
         } else {
-            // 라벨에서 못 찾은 경우 기존의 인덱스 번호 접근법을 폴백(Fallback)으로 유지
             let targetNum = parseInt(targetValue, 10);
             if (!isNaN(targetNum)) {
                 let target = Math.max(1, Math.min(folderProblems.length, targetNum));
