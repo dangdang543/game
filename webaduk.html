@@ -16,11 +16,14 @@
             width: 100%; max-width: 1200px; gap: 30px;
         }
         
-        /* 바둑판 영역: 화면 높이에 맞춰 최대화 */
+        /* 바둑판 영역: 타이젬 스타일의 입체적인 나무 배경과 그림자 적용 */
         #board-container { 
             position: relative; aspect-ratio: 1 / 1; 
-            background-color: #e6b873; border: 2px solid #b38644; box-shadow: inset 0 0 10px rgba(0,0,0,0.15); 
-            cursor: pointer; border-radius: 4px; -webkit-user-select: none; user-select: none;
+            /* 입체감을 위한 방사형 그라데이션 (가운데는 밝고 모서리는 어둡게) */
+            background: radial-gradient(circle at center, #ebb866 0%, #cc9036 80%, #9e6b21 100%);
+            border: 5px solid #523114; /* 실제 바둑판 테두리 같은 짙은 나무색 */
+            box-shadow: 0 15px 30px rgba(0,0,0,0.6), inset 0 0 25px rgba(0,0,0,0.3); /* 깊이감 있는 외부/내부 그림자 */
+            cursor: pointer; border-radius: 6px; -webkit-user-select: none; user-select: none;
             flex: 1 1 auto; max-width: calc(100vh - 80px); width: 100%;
         }
         svg { width: 100%; height: 100%; display: block; }
@@ -165,17 +168,36 @@
     let currentFolderViewBox = '0 0 400 400';
     let currentBoardSizeRendered = -1;
 
-    // 바둑판 크기에 맞는 격자선과 화점 생성
+    // 바둑판 크기에 맞는 격자선과 화점 생성 (3D 효과 추가)
     function drawBoardGrid(bSize = 19) {
         if (currentBoardSizeRendered === bSize) return;
         currentBoardSizeRendered = bSize;
 
-        let html = `<g id="grid-lines">`;
+        // 바둑돌 입체 효과 및 그림자를 위한 SVG 정의(defs) 추가
+        let html = `
+        <defs>
+            <filter id="stone-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="1.5" dy="2.5" stdDeviation="1.5" flood-color="#000" flood-opacity="0.45"/>
+            </filter>
+            <radialGradient id="grad-black" cx="30%" cy="30%" r="70%">
+                <stop offset="0%" stop-color="#777" />
+                <stop offset="30%" stop-color="#222" />
+                <stop offset="100%" stop-color="#050505" />
+            </radialGradient>
+            <radialGradient id="grad-white" cx="30%" cy="30%" r="70%">
+                <stop offset="0%" stop-color="#fff" />
+                <stop offset="70%" stop-color="#e3e3e3" />
+                <stop offset="100%" stop-color="#b3b3b3" />
+            </radialGradient>
+        </defs>
+        <g id="grid-lines">`;
+        
         let maxPos = pad + (bSize - 1) * step;
         for(let i = 0; i < bSize; i++) {
             let pos = pad + i * step;
-            html += `<line x1="${pad}" y1="${pos}" x2="${maxPos}" y2="${pos}" stroke="#555" stroke-width="0.8"/>`;
-            html += `<line x1="${pos}" y1="${pad}" x2="${pos}" y2="${maxPos}" stroke="#555" stroke-width="0.8"/>`;
+            // 줄 색상을 자연스러운 짙은 흑갈색으로 변경
+            html += `<line x1="${pad}" y1="${pos}" x2="${maxPos}" y2="${pos}" stroke="#331e0b" stroke-width="0.8"/>`;
+            html += `<line x1="${pos}" y1="${pad}" x2="${pos}" y2="${maxPos}" stroke="#331e0b" stroke-width="0.8"/>`;
         }
         
         let stars = [];
@@ -192,7 +214,8 @@
             if (bSize % 2 === 1) stars.push([mid, mid]);
         }
         stars.forEach(([cx, cy]) => {
-            html += `<circle cx="${pad + cx * step}" cy="${pad + cy * step}" r="2.5" fill="#333"/>`;
+            // 화점 색상도 줄 색상과 어울리게 변경
+            html += `<circle cx="${pad + cx * step}" cy="${pad + cy * step}" r="2.5" fill="#221105"/>`;
         });
         html += `</g><g id="stones"></g>`;
         svg.innerHTML = html;
@@ -409,17 +432,21 @@
                     let isLast = (x === lastX && y === lastY);
                     
                     if (stone.color === 'B') {
-                        html += `<circle cx="${cx}" cy="${cy}" r="9.3" fill="#111" stroke="#000" stroke-width="0.5"/>`;
+                        // 흑돌: 정의해둔 입체 그라데이션과 그림자 적용, 테두리 선(stroke) 제거
+                        html += `<circle cx="${cx}" cy="${cy}" r="9.3" fill="url(#grad-black)" filter="url(#stone-shadow)"/>`;
                     } else {
-                        html += `<circle cx="${cx}" cy="${cy}" r="9.3" fill="#fff" stroke="#999" stroke-width="0.8"/>`;
+                        // 백돌: 정의해둔 입체 그라데이션과 그림자 적용, 테두리 선(stroke) 제거
+                        html += `<circle cx="${cx}" cy="${cy}" r="9.3" fill="url(#grad-white)" filter="url(#stone-shadow)"/>`;
                     }
 
                     if (showMoveNumbers && stone.moveNum > 0) {
                         let textColor = stone.color === 'B' ? 'white' : 'black';
                         let fontSize = stone.moveNum >= 100 ? 9 : 10;
-                        html += `<text x="${cx}" y="${cy}" fill="${textColor}" font-size="${fontSize}" text-anchor="middle" dominant-baseline="central" font-family="Arial, sans-serif">${stone.moveNum}</text>`;
+                        // 폰트에 약간의 그림자를 주어 돌 위에서 더 잘 보이도록 수정
+                        html += `<text x="${cx}" y="${cy}" fill="${textColor}" font-size="${fontSize}" text-anchor="middle" dominant-baseline="central" font-family="Arial, sans-serif" style="text-shadow: 0px 1px 2px rgba(0,0,0,0.4);">${stone.moveNum}</text>`;
                     } else if (isLast && !showMoveNumbers) {
-                        let markerColor = stone.color === 'B' ? 'white' : 'black';
+                        // 마지막 수 표시를 타이젬처럼 선명하게(투명도 조정)
+                        let markerColor = stone.color === 'B' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.7)';
                         html += `<circle cx="${cx}" cy="${cy}" r="2.5" fill="${markerColor}"/>`;
                     }
                 }
