@@ -857,7 +857,7 @@
         let isProblem = problem_node.includes('AB[') || problem_node.includes('AW[');
         let flipX = false, flipY = false, isWhiteFirst = false;
 
-        // 파일열기는 원본 방향 유지. 폴더열기는 19x19의 잘라낸 장면만 변환.
+        // 파일열기는 원본 방향 유지. 폴더열기는 19x19의 일부만 잘라낸 장면만 변환.
         if (isProblem && !applyToUrl && boardSize === 19) {
             let allCoords = [];
             let coordRegex = /(AB|AW|AE|B|W|TB|TW|TR|SQ|CR|MA)((?:[\s]*\[[a-zA-Z]{2}\])+)/g;
@@ -872,10 +872,28 @@
                 }
             }
             if(allCoords.length > 0) {
-                let avgX = allCoords.reduce((sum, c) => sum + c.x, 0) / allCoords.length;
-                let avgY = allCoords.reduce((sum, c) => sum + c.y, 0) / allCoords.length;
-                flipX = avgX > (boardSize / 2 - 0.5);
-                flipY = avgY < (boardSize / 2 - 0.5);
+                let minX = Math.min(...allCoords.map(p => p.x));
+                let maxX = Math.max(...allCoords.map(p => p.x));
+                let minY = Math.min(...allCoords.map(p => p.y));
+                let maxY = Math.max(...allCoords.map(p => p.y));
+
+                let nearLeftEdge = minX <= 3;
+                let nearRightEdge = maxX >= 15;
+                let nearTopEdge = minY <= 3;
+                let nearBottomEdge = maxY >= 15;
+
+                // 바둑판 전체가 보이는 모양인지 판단 (양쪽 끝 변에 퍼져있거나 전체 영역에 넓게 걸친 경우)
+                let isFullBoard = (nearLeftEdge && nearRightEdge) || 
+                                  (nearTopEdge && nearBottomEdge) || 
+                                  ((maxX - minX >= 13) && (maxY - minY >= 13));
+
+                // 바둑판의 일부만 잘라서 보여주는 경우에만 좌하방면으로 회전/대칭 이동
+                if (!isFullBoard) {
+                    let avgX = allCoords.reduce((sum, c) => sum + c.x, 0) / allCoords.length;
+                    let avgY = allCoords.reduce((sum, c) => sum + c.y, 0) / allCoords.length;
+                    flipX = avgX > (boardSize / 2 - 0.5);
+                    flipY = avgY < (boardSize / 2 - 0.5);
+                }
             }
             let firstMoveMatch = remainder.match(/;([BW])\[/i);
             if (firstMoveMatch && firstMoveMatch[1].toUpperCase() === 'W') {
