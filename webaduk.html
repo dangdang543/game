@@ -218,7 +218,7 @@
         svg.innerHTML = html;
     }
 
-    // 해시 파싱 (URL에 s= 및 l= 파라미터가 띄어쓰기로 있을 경우 감지하여 셋업 변환)
+    // 해시 파싱 (URL에 s=, l=, sz= 파라미터가 띄어쓰기로 있을 경우 감지하여 셋업 변환)
     function parseHashData(hashString) {
         let setupB = "", setupW = "", moves = "";
         let decoded = "";
@@ -229,10 +229,12 @@
 
         let s_val = -1;
         let l_val = -1;
+        let sz_val = 19; // 기본값 19
 
         for (let i = 1; i < parts.length; i++) {
             if (parts[i].startsWith('s=')) s_val = parseInt(parts[i].substring(2));
             if (parts[i].startsWith('l=')) l_val = parseInt(parts[i].substring(2));
+            if (parts[i].startsWith('sz=')) sz_val = parseInt(parts[i].substring(3));
         }
 
         // 기본 해시 파싱 (셋업과 수순 분리)
@@ -286,11 +288,11 @@
             moves = moves.substring(setupCount * 2, endCount * 2);
         }
 
-        return { setupB, setupW, moves, s_val, l_val, startingMoveNum };
+        return { setupB, setupW, moves, s_val, l_val, sz_val, startingMoveNum };
     }
 
-    // 셋업과 순수 수순을 바탕으로 해시 문자열 생성
-    function buildHash(setupB, setupW, moves) {
+    // 셋업과 순수 수순을 바탕으로 해시 문자열 생성 (크기 정보 sz 포함)
+    function buildHash(setupB, setupW, moves, sz = 19) {
         let hash = "";
         if (setupB || setupW) {
             if (setupB) hash += "B" + setupB;
@@ -298,6 +300,9 @@
             hash += "_" + moves;
         } else {
             hash = moves;
+        }
+        if (sz && sz !== 19) {
+            hash += ` sz=${sz}`;
         }
         return hash;
     }
@@ -309,8 +314,10 @@
 
     // startingMoveNum을 이용해 정확한 돌의 색상과 차례 계산
     function computeBoardState(hashString, maxMoves, boardSize = 19) {
-        let board = Array(boardSize).fill(null).map(() => Array(boardSize).fill(null));
-        let { setupB, setupW, moves, startingMoveNum } = parseHashData(hashString); 
+        let { setupB, setupW, moves, startingMoveNum, sz_val } = parseHashData(hashString); 
+        let finalBoardSize = boardSize || sz_val || 19;
+
+        let board = Array(finalBoardSize).fill(null).map(() => Array(finalBoardSize).fill(null));
         
         if(maxMoves !== undefined) {
             moves = moves.substring(0, maxMoves * 2);
@@ -318,11 +325,11 @@
 
         for (let i = 0; i < setupB.length; i += 2) {
             let x = chars.indexOf(setupB[i]), y = chars.indexOf(setupB[i+1]);
-            if (x >= 0 && x < boardSize && y >= 0 && y < boardSize) board[y][x] = { color: 'B', moveNum: 0 };
+            if (x >= 0 && x < finalBoardSize && y >= 0 && y < finalBoardSize) board[y][x] = { color: 'B', moveNum: 0 };
         }
         for (let i = 0; i < setupW.length; i += 2) {
             let x = chars.indexOf(setupW[i]), y = chars.indexOf(setupW[i+1]);
-            if (x >= 0 && x < boardSize && y >= 0 && y < boardSize) board[y][x] = { color: 'W', moveNum: 0 };
+            if (x >= 0 && x < finalBoardSize && y >= 0 && y < finalBoardSize) board[y][x] = { color: 'W', moveNum: 0 };
         }
 
         let visualMoveNum = 0;
@@ -330,7 +337,7 @@
 
         for (let i = 0; i < moves.length; i += 2) {
             let x = chars.indexOf(moves[i]), y = chars.indexOf(moves[i+1]);
-            if (x >= 0 && x < boardSize && y >= 0 && y < boardSize) {
+            if (x >= 0 && x < finalBoardSize && y >= 0 && y < finalBoardSize) {
                 if (board[y][x] !== null) continue;
                 visualMoveNum++;
                 
@@ -344,13 +351,13 @@
                 
                 dirs.forEach(([dx, dy]) => {
                     let nx = x + dx, ny = y + dy;
-                    if (nx >= 0 && nx < boardSize && ny >= 0 && ny < boardSize && board[ny][nx] && board[ny][nx].color === opponent) {
-                        let group = [], liberties = new Set(), visited = Array(boardSize).fill(false).map(() => Array(boardSize).fill(false));
+                    if (nx >= 0 && nx < finalBoardSize && ny >= 0 && ny < finalBoardSize && board[ny][nx] && board[ny][nx].color === opponent) {
+                        let group = [], liberties = new Set(), visited = Array(finalBoardSize).fill(false).map(() => Array(finalBoardSize).fill(false));
                         function dfs(cx, cy) {
                             visited[cy][cx] = true; group.push({x: cx, y: cy});
                             dirs.forEach(([idx, idy]) => {
                                 let nnx = cx + idx, nny = cy + idy;
-                                if (nnx >= 0 && nnx < boardSize && nny >= 0 && nny < boardSize) {
+                                if (nnx >= 0 && nnx < finalBoardSize && nny >= 0 && nny < finalBoardSize) {
                                     if (board[nny][nnx] === null) liberties.add(`${nnx},${nny}`);
                                     else if (board[nny][nnx] && board[nny][nnx].color === opponent && !visited[nny][nnx]) dfs(nnx, nny);
                                 }
@@ -361,12 +368,12 @@
                     }
                 });
                 
-                let ownLiberties = new Set(), ownVisited = Array(boardSize).fill(false).map(() => Array(boardSize).fill(false));
+                let ownLiberties = new Set(), ownVisited = Array(finalBoardSize).fill(false).map(() => Array(finalBoardSize).fill(false));
                 function dfsOwn(cx, cy) {
                     ownVisited[cy][cx] = true;
                     dirs.forEach(([idx, idy]) => {
                         let nnx = cx + idx, nny = cy + idy;
-                        if (nnx >= 0 && nnx < boardSize && nny >= 0 && nny < boardSize) {
+                        if (nnx >= 0 && nnx < finalBoardSize && nny >= 0 && nny < finalBoardSize) {
                             if (board[nny][nnx] === null) ownLiberties.add(`${nnx},${nny}`);
                             else if (board[nny][nnx] && board[nny][nnx].color === color && !ownVisited[nny][nnx]) dfsOwn(nnx, nny);
                         }
@@ -384,14 +391,15 @@
     }
 
     function getProblemViewBox(hashString) {
-        const { setupB, setupW, moves } = parseHashData(hashString);
+        const { setupB, setupW, moves, sz_val } = parseHashData(hashString);
+        let bSize = sz_val || 19;
         const points = [];
 
         function addCoords(coordString) {
             for (let i = 0; i + 1 < coordString.length; i += 2) {
                 const x = chars.indexOf(coordString[i]);
                 const y = chars.indexOf(coordString[i + 1]);
-                if (x >= 0 && x < 19 && y >= 0 && y < 19) {
+                if (x >= 0 && x < bSize && y >= 0 && y < bSize) {
                     points.push({ x, y });
                 }
             }
@@ -401,7 +409,13 @@
         addCoords(setupW);
         addCoords(moves);
 
-        if (points.length === 0) return '0 0 400 400';
+        if (points.length === 0) {
+            if (bSize !== 19) {
+                const totalLength = pad * 2 + (bSize - 1) * step;
+                return `0 0 ${totalLength} ${totalLength}`;
+            }
+            return '0 0 400 400';
+        }
 
         let minX = Math.min(...points.map(p => p.x));
         let maxX = Math.max(...points.map(p => p.x));
@@ -409,9 +423,9 @@
         let maxY = Math.max(...points.map(p => p.y));
 
         const nearLeftEdge = minX <= 3;
-        const nearRightEdge = maxX >= 15;
+        const nearRightEdge = maxX >= (bSize - 4);
         const nearTopEdge = minY <= 3;
-        const nearBottomEdge = maxY >= 15;
+        const nearBottomEdge = maxY >= (bSize - 4);
 
         const contentMargin = 1;
         const cornerMargin = 1.25;
@@ -420,13 +434,13 @@
             ? pad + (0 - cornerMargin) * step
             : pad + (minX - contentMargin) * step;
         let right = nearRightEdge
-            ? pad + (18 + cornerMargin) * step
+            ? pad + (bSize - 1 + cornerMargin) * step
             : pad + (maxX + contentMargin) * step;
         let top = nearTopEdge
             ? pad + (0 - cornerMargin) * step
             : pad + (minY - contentMargin) * step;
         let bottom = nearBottomEdge
-            ? pad + (18 + cornerMargin) * step
+            ? pad + (bSize - 1 + cornerMargin) * step
             : pad + (maxY + contentMargin) * step;
 
         let width = right - left;
@@ -469,17 +483,30 @@
     }
 
     function applyBoardViewBox() {
-        svg.setAttribute('viewBox', isFolderMode ? currentFolderViewBox : '0 0 400 400');
+        if (isFolderMode) {
+            svg.setAttribute('viewBox', currentFolderViewBox);
+        } else {
+            let hash = window.location.hash.substring(1);
+            let { sz_val } = parseHashData(hash);
+            let bSize = sz_val || 19;
+            if (bSize !== 19) {
+                const totalLength = pad * 2 + (bSize - 1) * step;
+                svg.setAttribute('viewBox', `0 0 ${totalLength} ${totalLength}`);
+            } else {
+                svg.setAttribute('viewBox', '0 0 400 400');
+            }
+        }
     }
 
     function render() {
         let activeProblem = (isFolderMode && folderProblems[currentFileIndex]) ? folderProblems[currentFileIndex] : null;
-        let bSize = activeProblem ? (activeProblem.boardSize || 19) : 19;
+        let hash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
+        let parsed = parseHashData(hash);
+        let bSize = activeProblem ? (activeProblem.boardSize || 19) : (parsed.sz_val || 19);
 
         drawBoardGrid(bSize);
         applyBoardViewBox();
 
-        let hash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
         let { board, moveCount, lastX, lastY, startingMoveNum } = computeBoardState(hash, currentMoveIndex, bSize);
         let stonesGroup = document.getElementById('stones');
         let html = '';
@@ -542,24 +569,24 @@
         let gridY = Math.round((svgPoint.y - pad) / step);
 
         let activeProblem = (isFolderMode && folderProblems[currentFileIndex]) ? folderProblems[currentFileIndex] : null;
-        let bSize = activeProblem ? (activeProblem.boardSize || 19) : 19;
+        let currentHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
+        let parsedHash = parseHashData(currentHash);
+        let bSize = activeProblem ? (activeProblem.boardSize || 19) : (parsedHash.sz_val || 19);
 
         if (gridX >= 0 && gridX < bSize && gridY >= 0 && gridY < bSize) {
-            let currentHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
-            
             let { board } = computeBoardState(currentHash, currentMoveIndex, bSize);
             if (board[gridY][gridX] !== null) {
                 return; 
             }
             
-            let { setupB, setupW, moves } = parseHashData(currentHash);
+            let { setupB, setupW, moves } = parsedHash;
             
             moves = moves.substring(0, currentMoveIndex * 2);
             let nextMove = chars[gridX] + chars[gridY];
             let newMoves = moves + nextMove;
             
             // 바둑판에 착수하여 새로운 분기를 만들 경우 s= 와 l= 효과는 해제되고 새로운 해시가 생성됨
-            let newHash = buildHash(setupB, setupW, newMoves);
+            let newHash = buildHash(setupB, setupW, newMoves, bSize);
             
             if (isFolderMode) {
                 currentFolderHash = newHash;
@@ -649,9 +676,12 @@
             btn.classList.add('active');
             btn.innerText = '🛑 검토 종료';
 
-            let { setupB, setupW, moves } = parseHashData(isFolderMode ? currentFolderHash : window.location.hash.substring(1));
-            moves = moves.substring(0, currentMoveIndex * 2);
-            let newHash = buildHash(setupB, setupW, moves);
+            let currentHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
+            let parsed = parseHashData(currentHash);
+            let bSize = (isFolderMode && folderProblems[currentFileIndex]) ? (folderProblems[currentFileIndex].boardSize || 19) : (parsed.sz_val || 19);
+
+            let moves = parsed.moves.substring(0, currentMoveIndex * 2);
+            let newHash = buildHash(parsed.setupB, parsed.setupW, moves, bSize);
 
             if (isFolderMode) {
                 currentFolderHash = newHash;
@@ -857,8 +887,8 @@
         let isProblem = problem_node.includes('AB[') || problem_node.includes('AW[');
         let flipX = false, flipY = false, isWhiteFirst = false;
 
-        // 파일열기는 원본 방향 유지. 폴더열기는 19x19의 일부만 잘라낸 장면만 변환.
-        if (isProblem && !applyToUrl && boardSize === 19) {
+        // 파일열기는 원본 방향 유지. 폴더열기는 바둑판 크기를 벗어나지 않는 선에서 일부만 잘라낸 장면 변환.
+        if (isProblem && !applyToUrl) {
             let allCoords = [];
             let coordRegex = /(AB|AW|AE|B|W|TB|TW|TR|SQ|CR|MA)((?:[\s]*\[[a-zA-Z]{2}\])+)/g;
             let match;
@@ -878,14 +908,14 @@
                 let maxY = Math.max(...allCoords.map(p => p.y));
 
                 let nearLeftEdge = minX <= 3;
-                let nearRightEdge = maxX >= 15;
+                let nearRightEdge = maxX >= (boardSize - 4);
                 let nearTopEdge = minY <= 3;
-                let nearBottomEdge = maxY >= 15;
+                let nearBottomEdge = maxY >= (boardSize - 4);
 
-                // 바둑판 전체가 보이는 모양인지 판단 (양쪽 끝 변에 퍼져있거나 전체 영역에 넓게 걸친 경우)
+                // 바둑판 전체가 보이는 모양인지 판단
                 let isFullBoard = (nearLeftEdge && nearRightEdge) || 
                                   (nearTopEdge && nearBottomEdge) || 
-                                  ((maxX - minX >= 13) && (maxY - minY >= 13));
+                                  ((maxX - minX >= boardSize - 6) && (maxY - minY >= boardSize - 6));
 
                 // 바둑판의 일부만 잘라서 보여주는 경우에만 좌하방면으로 회전/대칭 이동
                 if (!isFullBoard) {
@@ -968,7 +998,7 @@
                     movesHash += transformStr(m[1].toLowerCase());
                 });
             });
-            let newHash = buildHash(setupB_str, setupW_str, movesHash);
+            let newHash = buildHash(setupB_str, setupW_str, movesHash, boardSize);
             return {
                 hash: newHash,
                 isProblem: isProblem,
@@ -999,7 +1029,7 @@
             });
         });
 
-        let bestHash = buildHash(setupB_str, setupW_str, bestMovesHash);
+        let bestHash = buildHash(setupB_str, setupW_str, bestMovesHash, boardSize);
 
         if (applyToUrl) {
             isFolderMode = false;
@@ -1293,13 +1323,15 @@
     }
 
     function downloadSGF() {
-        let bSize = currentBoardSizeRendered > 0 ? currentBoardSizeRendered : 19;
-        let sgfContent = `(;GM[1]FF[4]SZ[${bSize}]`;
         let activeHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
+        let { setupB, setupW, moves, startingMoveNum, sz_val } = parseHashData(activeHash);
         
-        // 다운로드 시, URL의 s와 l에 의해 변환된 셋업 및 컷팅된 수순을 그대로 SGF로 만듦
-        let { setupB, setupW, moves, startingMoveNum } = parseHashData(activeHash);
+        // 다운로드 시 크기 정보 확인
+        let bSize = (isFolderMode && folderProblems[currentFileIndex]) ? (folderProblems[currentFileIndex].boardSize || 19) : (sz_val || 19);
+        
+        let sgfContent = `(;GM[1]FF[4]SZ[${bSize}]`;
 
+        // 다운로드 시, URL의 s와 l에 의해 변환된 셋업 및 컷팅된 수순을 그대로 SGF로 만듦
         if (setupB.length > 0) {
             sgfContent += "AB";
             for (let i = 0; i < setupB.length; i += 2) sgfContent += `[${setupB.slice(i, i+2)}]`;
