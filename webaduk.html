@@ -55,12 +55,8 @@
         
         .btn-nav { background-color: #4b5563; color: white; flex: 0.8 !important; font-size: 16px !important; }
         
-        /* 주목 버튼 스타일 */
-        .btn-focus { background-color: #f59e0b; color: white; flex: 1.2 !important; padding: 12px 2px; }
-        .btn-focus.active { background-color: #fde047; color: black; box-shadow: 0 0 10px rgba(253,224,71,0.6); }
-
-        .btn-review { background-color: #9333ea; color: white; flex: 1.2 !important; padding: 12px 2px;}
-        .btn-capture { background-color: #be185d; color: white; flex: 1.2 !important; padding: 12px 2px;}
+        .btn-review { background-color: #9333ea; color: white; flex: 1.5 !important; padding: 12px 2px;}
+        .btn-capture { background-color: #be185d; color: white; flex: 1.5 !important; padding: 12px 2px;}
         .btn-review.active { background-color: #dc2626; animation: pulse 1.5s infinite; }
 
         .btn-folder-nav { background-color: #374151; color: white; font-size: 11px !important; flex: 1 !important; padding: 10px 2px !important; letter-spacing: -0.5px; }
@@ -129,7 +125,6 @@
                 <button id="btn-prev-move" class="btn-nav" onclick="goPrevMove()" title="왼쪽 방향키 / S (항상 사용 가능)">◀</button>
                 <input type="number" id="move-input" min="0" value="0" onkeydown="handleInputEnter(event)" onblur="jumpToMove()">
                 <button id="btn-next-move" class="btn-nav" onclick="goNextMove()" title="오른쪽 방향키 / F (항상 사용 가능)">▶</button>
-                <button id="btn-focus" class="btn-focus" onclick="toggleFocusMove()" title="현재 수순을 링크에 강조">⭐ 주목</button>
                 <button id="btn-review" class="btn-review" onclick="toggleReviewMode()" title="E">🔍 검토</button>
                 <button class="btn-capture" onclick="captureBoard()">📸 캡쳐</button>
             </div>
@@ -223,14 +218,28 @@
         svg.innerHTML = html;
     }
 
-    // 해시 파싱 (주목 5xx5 마커 추출 및 제거 기능 포함)
+    // 해시 파싱 (URL에 s= 및 l= 파라미터가 띄어쓰기로 있을 경우 감지하여 셋업 변환)
     function parseHashData(hashString) {
         let setupB = "", setupW = "", moves = "";
+        let decoded = "";
+        try { decoded = decodeURIComponent(hashString); } catch(e) { decoded = hashString; }
         
-        if (hashString.includes('B') || hashString.includes('W') || hashString.includes('_')) {
-            let parts = hashString.split('_');
-            let setupPart = parts[0];
-            moves = parts[1] || "";
+        let parts = decoded.trim().split(/\s+/);
+        let baseHash = parts[0];
+
+        let s_val = -1;
+        let l_val = -1;
+
+        for (let i = 1; i < parts.length; i++) {
+            if (parts[i].startsWith('s=')) s_val = parseInt(parts[i].substring(2));
+            if (parts[i].startsWith('l=')) l_val = parseInt(parts[i].substring(2));
+        }
+
+        // 기본 해시 파싱 (셋업과 수순 분리)
+        if (baseHash.includes('B') || baseHash.includes('W') || baseHash.includes('_')) {
+            let p = baseHash.split('_');
+            let setupPart = p[0];
+            moves = p[1] || "";
             
             let bIdx = setupPart.indexOf('B');
             let wIdx = setupPart.indexOf('W');
@@ -249,38 +258,46 @@
                 setupW = setupPart.substring(wIdx + 1);
             }
         } else {
-            moves = hashString;
+            moves = baseHash;
         }
 
-        // '5xx5' 형식의 주목 마커 감지 및 추출
-        let focusMoveIndex = -1;
-        let match = moves.match(/5([a-zA-Z]{2})5/);
-        if (match) {
-            // '5' 앞의 글자 수를 2로 나누면 이전 수순의 개수가 됨. +1을 하여 주목된 수순 번호를 얻음
-            focusMoveIndex = match.index / 2 + 1;
-            // 내부 계산 및 렌더링에 방해되지 않도록 '5' 문자를 모두 제거 (순수 수순 데이터만 남김)
-            moves = moves.replace(/5([a-zA-Z]{2})5/g, '$1');
+        // 흑/백 차례 계산을 위한 시작 순번 (기본 1번째 수는 흑)
+        let startingMoveNum = 1;
+
+        // s와 l이 모두 있을 경우 수순 잘라내고 셋업으로 변환
+        if (s_val > 0 && l_val > 0) {
+            let setupCount = s_val - 1;
+            if (setupCount > moves.length / 2) setupCount = moves.length / 2;
+            
+            // 앞의 수순들을 흑/백 셋업으로 이동
+            for (let i = 0; i < setupCount; i++) {
+                let coord = moves.substring(i * 2, i * 2 + 2);
+                if (i % 2 === 0) setupB += coord;
+                else setupW += coord;
+            }
+            
+            // 잘려나간 수순만큼 차례 오프셋 증가
+            startingMoveNum = setupCount + 1;
+
+            let endCount = l_val;
+            if (endCount > moves.length / 2) endCount = moves.length / 2;
+            
+            // 남은 수순 자르기
+            moves = moves.substring(setupCount * 2, endCount * 2);
         }
 
-        return { setupB, setupW, moves, focusMoveIndex };
+        return { setupB, setupW, moves, s_val, l_val, startingMoveNum };
     }
 
-    // 셋업, 순수 수순, 그리고 주목할 수순 인덱스를 바탕으로 해시 문자열 생성
-    function buildHash(setupB, setupW, moves, focusIndex) {
-        let movesWithFocus = moves;
-        // 주목할 수순이 유효 범위 내에 있으면 5xx5 형식으로 감싸기
-        if (focusIndex > 0 && focusIndex <= moves.length / 2) {
-            let insertPos = (focusIndex - 1) * 2;
-            movesWithFocus = moves.substring(0, insertPos) + "5" + moves.substring(insertPos, insertPos + 2) + "5" + moves.substring(insertPos + 2);
-        }
-        
+    // 셋업과 순수 수순을 바탕으로 해시 문자열 생성
+    function buildHash(setupB, setupW, moves) {
         let hash = "";
         if (setupB || setupW) {
             if (setupB) hash += "B" + setupB;
             if (setupW) hash += "W" + setupW;
-            hash += "_" + movesWithFocus;
+            hash += "_" + moves;
         } else {
-            hash = movesWithFocus;
+            hash = moves;
         }
         return hash;
     }
@@ -290,9 +307,10 @@
         window.location.hash = newHash;
     }
 
+    // startingMoveNum을 이용해 정확한 돌의 색상과 차례 계산
     function computeBoardState(hashString, maxMoves, boardSize = 19) {
         let board = Array(boardSize).fill(null).map(() => Array(boardSize).fill(null));
-        let { setupB, setupW, moves } = parseHashData(hashString); // 주목 마커가 정제된 순수 수순 데이터 반환
+        let { setupB, setupW, moves, startingMoveNum } = parseHashData(hashString); 
         
         if(maxMoves !== undefined) {
             moves = moves.substring(0, maxMoves * 2);
@@ -307,16 +325,18 @@
             if (x >= 0 && x < boardSize && y >= 0 && y < boardSize) board[y][x] = { color: 'W', moveNum: 0 };
         }
 
-        let moveCount = 0;
+        let visualMoveNum = 0;
         let lastX = -1, lastY = -1;
 
         for (let i = 0; i < moves.length; i += 2) {
             let x = chars.indexOf(moves[i]), y = chars.indexOf(moves[i+1]);
             if (x >= 0 && x < boardSize && y >= 0 && y < boardSize) {
                 if (board[y][x] !== null) continue;
-                moveCount++;
-                let color = (moveCount % 2 !== 0) ? 'B' : 'W';
-                board[y][x] = { color: color, moveNum: moveCount };
+                visualMoveNum++;
+                
+                // 원본 수순의 시작점(startingMoveNum)을 고려하여 색상 결정
+                let color = ((visualMoveNum - 1 + startingMoveNum - 1) % 2 === 0) ? 'B' : 'W';
+                board[y][x] = { color: color, moveNum: visualMoveNum };
                 lastX = x; lastY = y;
 
                 let opponent = color === 'B' ? 'W' : 'B';
@@ -355,12 +375,12 @@
                 dfsOwn(x, y);
                 if (ownLiberties.size === 0) { 
                     board[y][x] = null; 
-                    moveCount--; 
+                    visualMoveNum--; 
                     if(i === moves.length - 2) { lastX = -1; lastY = -1; } 
                 }
             }
         }
-        return { board, moveCount, lastX, lastY };
+        return { board, moveCount: visualMoveNum, lastX, lastY, startingMoveNum };
     }
 
     function getProblemViewBox(hashString) {
@@ -460,7 +480,7 @@
         applyBoardViewBox();
 
         let hash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
-        let { board, moveCount, lastX, lastY } = computeBoardState(hash, currentMoveIndex, bSize);
+        let { board, moveCount, lastX, lastY, startingMoveNum } = computeBoardState(hash, currentMoveIndex, bSize);
         let stonesGroup = document.getElementById('stones');
         let html = '';
         
@@ -490,22 +510,12 @@
         }
         stonesGroup.innerHTML = html;
         
-        let nextColor = (moveCount % 2 === 0) ? 'B' : 'W';
+        // 차례 텍스트 및 UI 업데이트
+        let nextColor = ((moveCount + startingMoveNum - 1) % 2 === 0) ? 'B' : 'W';
         document.getElementById('turn-color').className = `turn-indicator turn-${nextColor}`;
         let modeText = isReviewMode ? "[검토중] " : "";
         document.getElementById('status-text').innerText = `${modeText}${nextColor === 'B' ? '흑' : '백'}의 차례 (현재 ${moveCount}수)`;
         document.getElementById('move-input').value = moveCount;
-
-        // 주목 수순 시각적 강조
-        let { focusMoveIndex } = parseHashData(hash);
-        let btnFocus = document.getElementById('btn-focus');
-        if (btnFocus) {
-            if (focusMoveIndex !== -1 && currentMoveIndex === focusMoveIndex && currentMoveIndex > 0) {
-                btnFocus.classList.add('active');
-            } else {
-                btnFocus.classList.remove('active');
-            }
-        }
     }
 
     document.getElementById('board-container').addEventListener('click', function(e) {
@@ -542,15 +552,14 @@
                 return; 
             }
             
-            let { setupB, setupW, moves, focusMoveIndex } = parseHashData(currentHash);
+            let { setupB, setupW, moves } = parseHashData(currentHash);
             
             moves = moves.substring(0, currentMoveIndex * 2);
             let nextMove = chars[gridX] + chars[gridY];
             let newMoves = moves + nextMove;
             
-            // 기존에 주목 마커가 있었는데 새 수를 둠으로써 그 이후 수순이 잘려나갔다면 마커 해제
-            let newFocus = (focusMoveIndex > 0 && focusMoveIndex <= currentMoveIndex) ? focusMoveIndex : -1;
-            let newHash = buildHash(setupB, setupW, newMoves, newFocus);
+            // 바둑판에 착수하여 새로운 분기를 만들 경우 s= 와 l= 효과는 해제되고 새로운 해시가 생성됨
+            let newHash = buildHash(setupB, setupW, newMoves);
             
             if (isFolderMode) {
                 currentFolderHash = newHash;
@@ -584,19 +593,25 @@
         document.getElementById('detail-nav').style.display = 'none';
 
         let currentHash = window.location.hash.substring(1);
-        let { moves, focusMoveIndex } = parseHashData(currentHash);
+        let { moves, s_val, l_val } = parseHashData(currentHash);
 
         if (window.isSgfFileLoading) {
             if (window.loadedSgfIsProblem) {
                 currentMoveIndex = 0;
             } else {
-                // SGF 로딩 시 주목 정보가 있으면 점프
-                currentMoveIndex = focusMoveIndex !== -1 ? focusMoveIndex : moves.length / 2;
+                currentMoveIndex = moves.length / 2;
             }
             window.isSgfFileLoading = false;
         } else {
-            // 외부 링크나 앞으로/뒤로가기로 인한 해시 변경 시 주목 수순 우선 이동
-            currentMoveIndex = focusMoveIndex !== -1 ? focusMoveIndex : moves.length / 2;
+            // URL 파라미터 s, l 유무에 따른 currentMoveIndex 결정
+            if (s_val > 0 && l_val > 0) {
+                currentMoveIndex = 0; // 변환 후의 0번째 수 (즉 착수 전 장면) 표시로 수정
+            } else if (s_val > 0) {
+                currentMoveIndex = s_val;
+                if (currentMoveIndex > moves.length / 2) currentMoveIndex = moves.length / 2;
+            } else {
+                currentMoveIndex = moves.length / 2;
+            }
         }
         render();
     });
@@ -619,31 +634,6 @@
         currentMoveIndex = targetMove; render();
     }
 
-    function toggleFocusMove() {
-        if (currentMoveIndex === 0) {
-            alert("수순이 하나 이상 진행된 상태에서만 주목할 수 있습니다.");
-            return;
-        }
-
-        let currentHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
-        let { setupB, setupW, moves, focusMoveIndex } = parseHashData(currentHash);
-
-        // 이미 현재 수순에 주목 마커가 있다면 해제(-1), 아니라면 현재 수순으로 갱신
-        let newFocus = (focusMoveIndex === currentMoveIndex) ? -1 : currentMoveIndex;
-        let newHash = buildHash(setupB, setupW, moves, newFocus);
-
-        if (isFolderMode) {
-            currentFolderHash = newHash;
-            if (folderProblems[currentFileIndex]) {
-                folderProblems[currentFileIndex].hash = newHash;
-            }
-            history.replaceState(null, null, '#' + getFolderUrlHash());
-            render();
-        } else {
-            setHashInternally(newHash); // 현재 수순을 유지하며 해시만 업데이트
-        }
-    }
-
     function toggleReviewMode() {
         let btn = document.getElementById('btn-review');
         isReviewMode = !isReviewMode;
@@ -659,10 +649,9 @@
             btn.classList.add('active');
             btn.innerText = '🛑 검토 종료';
 
-            let { setupB, setupW, moves, focusMoveIndex } = parseHashData(isFolderMode ? currentFolderHash : window.location.hash.substring(1));
+            let { setupB, setupW, moves } = parseHashData(isFolderMode ? currentFolderHash : window.location.hash.substring(1));
             moves = moves.substring(0, currentMoveIndex * 2);
-            let newFocus = (focusMoveIndex > 0 && focusMoveIndex <= currentMoveIndex) ? focusMoveIndex : -1;
-            let newHash = buildHash(setupB, setupW, moves, newFocus);
+            let newHash = buildHash(setupB, setupW, moves);
 
             if (isFolderMode) {
                 currentFolderHash = newHash;
@@ -952,8 +941,6 @@
 
         if (allPaths.length === 0) allPaths.push([]); 
 
-        let hasSetup = (setupB_str.length > 0 || setupW_str.length > 0);
-
         let branchesInfo = allPaths.map((path, idx) => {
             let movesHash = "";
             path.forEach(node => {
@@ -962,7 +949,7 @@
                     movesHash += transformStr(m[1].toLowerCase());
                 });
             });
-            let newHash = buildHash(setupB_str, setupW_str, movesHash, -1);
+            let newHash = buildHash(setupB_str, setupW_str, movesHash);
             return {
                 hash: newHash,
                 isProblem: isProblem,
@@ -993,7 +980,7 @@
             });
         });
 
-        let bestHash = buildHash(setupB_str, setupW_str, bestMovesHash, -1);
+        let bestHash = buildHash(setupB_str, setupW_str, bestMovesHash);
 
         if (applyToUrl) {
             isFolderMode = false;
@@ -1157,12 +1144,12 @@
         currentFolderHash = problem.hash;
         currentFolderViewBox = getFolderProblemViewBox(problem);
         
-        let { moves, focusMoveIndex } = parseHashData(currentFolderHash);
+        let { moves } = parseHashData(currentFolderHash);
         
         if (problem.isProblem) {
             currentMoveIndex = 0;
         } else {
-            currentMoveIndex = focusMoveIndex !== -1 ? focusMoveIndex : moves.length / 2;
+            currentMoveIndex = moves.length / 2;
         }
         
         isReviewMode = false;
@@ -1290,7 +1277,9 @@
         let bSize = currentBoardSizeRendered > 0 ? currentBoardSizeRendered : 19;
         let sgfContent = `(;GM[1]FF[4]SZ[${bSize}]`;
         let activeHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
-        let { setupB, setupW, moves } = parseHashData(activeHash);
+        
+        // 다운로드 시, URL의 s와 l에 의해 변환된 셋업 및 컷팅된 수순을 그대로 SGF로 만듦
+        let { setupB, setupW, moves, startingMoveNum } = parseHashData(activeHash);
 
         if (setupB.length > 0) {
             sgfContent += "AB";
@@ -1301,8 +1290,13 @@
             for (let i = 0; i < setupW.length; i += 2) sgfContent += `[${setupW.slice(i, i+2)}]`;
         }
         
+        // 셋업 결과 백 차례로 시작될 경우 PL(Player to play) 속성 추가
+        if (startingMoveNum % 2 === 0) {
+            sgfContent += "PL[W]";
+        }
+        
         for (let i = 0; i < moves.length; i += 2) {
-            let color = (i / 2 % 2 === 0) ? 'B' : 'W';
+            let color = ((i / 2 + startingMoveNum - 1) % 2 === 0) ? 'B' : 'W';
             sgfContent += `;${color}[${moves.slice(i, i+2)}]`;
         }
         sgfContent += ")";
@@ -1321,9 +1315,16 @@
         if (!loadFolderFromUrl()) {
             if (window.location.hash) {
                 let currentHash = window.location.hash.substring(1);
-                let { moves, focusMoveIndex } = parseHashData(currentHash);
-                // 주소창에 주목 마커가 있다면 로딩 시 자동으로 해당 수순으로 이동
-                currentMoveIndex = focusMoveIndex !== -1 ? focusMoveIndex : moves.length / 2;
+                let { moves, s_val, l_val } = parseHashData(currentHash);
+                
+                if (s_val > 0 && l_val > 0) {
+                    currentMoveIndex = 0; // 초기 화면을 착수 전(0수) 상태로 세팅
+                } else if (s_val > 0) {
+                    currentMoveIndex = s_val;
+                    if (currentMoveIndex > moves.length / 2) currentMoveIndex = moves.length / 2;
+                } else {
+                    currentMoveIndex = moves.length / 2;
+                }
                 render();
             } else {
                 render();
