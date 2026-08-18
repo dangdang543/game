@@ -857,7 +857,8 @@
         let isProblem = problem_node.includes('AB[') || problem_node.includes('AW[');
         let flipX = false, flipY = false, isWhiteFirst = false;
 
-        if (isProblem) {
+        // 파일열기는 원본 방향 유지. 폴더열기는 19x19의 잘라낸 장면만 변환.
+        if (isProblem && !applyToUrl && boardSize === 19) {
             let allCoords = [];
             let coordRegex = /(AB|AW|AE|B|W|TB|TW|TR|SQ|CR|MA)((?:[\s]*\[[a-zA-Z]{2}\])+)/g;
             let match;
