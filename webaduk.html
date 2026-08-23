@@ -16,65 +16,85 @@
             width: 100%; max-width: 1200px; gap: 30px;
         }
         
-        /* 바둑판 영역: 눈이 편안한 톤다운 단색 배경 적용 */
+        /* 바둑판 영역 */
         #board-container { 
             position: relative; aspect-ratio: 1 / 1; 
-            background-color: #9e7646; /* 균일하고 톤다운된 나무색상 */
-            border: 5px solid #523114; /* 실제 바둑판 테두리 같은 짙은 나무색 */
-            box-shadow: 0 15px 30px rgba(0,0,0,0.6), inset 0 0 25px rgba(0,0,0,0.3); /* 깊이감 있는 외부/내부 그림자 */
+            background-color: #9e7646; 
+            border: 5px solid #523114; 
+            box-shadow: 0 15px 30px rgba(0,0,0,0.6), inset 0 0 25px rgba(0,0,0,0.3); 
             cursor: pointer; border-radius: 6px; -webkit-user-select: none; user-select: none;
             flex: 1 1 auto; max-width: calc(100vh - 80px); width: 100%;
         }
         svg { width: 100%; height: 100%; display: block; }
         
-        /* 우측 사이드바(상태창 및 버튼 영역) */
+        /* 우측 사이드바 */
         .sidebar {
             flex: 0 0 320px; display: flex; flex-direction: column; gap: 15px; width: 100%;
         }
 
+        .controls-container { display: flex; flex-direction: column; gap: 10px; }
+        
+        /* 줄별 배치 설정 */
+        .row-top, .row-1, .row-2, .row-3, .row-4 { display: flex; gap: 8px; width: 100%; align-items: stretch; justify-content: space-between; }
+        
+        /* 최상단 레이아웃 */
+        .row-top { margin-bottom: 5px; }
+        
         /* 상태창 다크 모드 적용 */
-        .status-box { padding: 12px; background: #2d2d2d; border-radius: 6px; font-size: 15px; font-weight: bold; color: #f3f4f6; text-align: center; }
+        .status-box { flex: 1.2; padding: 12px; background: #2d2d2d; border-radius: 6px; font-size: 15px; font-weight: bold; color: #f3f4f6; text-align: center; display: flex; align-items: center; justify-content: center; margin: 0; }
         .turn-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
         .turn-B { background: black; border: 1px solid #555; }
         .turn-W { background: white; border: 1px solid #ccc; }
 
-        .controls-container { display: flex; flex-direction: column; gap: 10px; }
-        .row-1, .row-2, .row-3, .row-4 { display: flex; gap: 8px; width: 100%; align-items: stretch; justify-content: space-between; }
-        
-        button { border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s; -webkit-tap-highlight-color: transparent; font-family: inherit; }
+        /* 공통 버튼 스타일 - 모두 회색톤으로 통일 */
+        button { 
+            border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s; 
+            -webkit-tap-highlight-color: transparent; font-family: inherit; 
+            background-color: #6b7280; color: white; /* 통일된 회색톤 */
+        }
         button:active { transform: scale(0.96); }
         button.keyboard-active { transform: scale(0.96); filter: brightness(0.9); }
-        
-        .row-1 > button, .row-2 > button, .row-3 > button, .row-4 > button { flex: 1; padding: 12px 4px; font-size: 13px; font-weight: bold; white-space: nowrap; letter-spacing: -0.5px; }
-        
-        .btn-primary { background-color: #4f46e5; color: white; }
-        .btn-download { background-color: #059669; color: white; }
-        .btn-upload { background-color: #d97706; color: white; } 
-        .btn-upload-folder { background-color: #ea580c; color: white; } 
-        .btn-info { background-color: #0284c7; color: white; }
-        
-        .btn-nav { background-color: #4b5563; color: white; flex: 0.8 !important; font-size: 16px !important; }
-        
-        .btn-review { background-color: #9333ea; color: white; flex: 1.5 !important; padding: 12px 2px;}
-        .btn-capture { background-color: #be185d; color: white; flex: 1.5 !important; padding: 12px 2px;}
-        .btn-review.active { background-color: #dc2626; animation: pulse 1.5s infinite; }
+        button:disabled { background-color: #4b5563; color: #9ca3af; cursor: not-allowed; opacity: 0.75; }
+        button:disabled:active { transform: none; }
 
-        .btn-folder-nav { background-color: #374151; color: white; font-size: 11px !important; flex: 1 !important; padding: 10px 2px !important; letter-spacing: -0.5px; }
-        .btn-detail { background-color: #0f766e; color: white; font-size: 14px !important; }
-        .btn-detail:disabled { background-color: #4b5563; color: #9ca3af; cursor: not-allowed; opacity: 0.75; }
-        .btn-detail:disabled:active { transform: none; }
+        /* 2, 3, 5번째 줄 버튼 기본 패딩 */
+        .row-1 > button, .row-2 > button, .row-4 > button { 
+            flex: 1; padding: 12px 2px; font-size: 13px; font-weight: bold; white-space: nowrap; letter-spacing: -0.5px; 
+        }
+
+        /* 4번째 줄 (폴더 네비게이션) - 두께 20% 증가 */
+        .row-3 > button { 
+            flex: 1; padding: 15px 2px; font-size: 12px; font-weight: bold; white-space: nowrap; letter-spacing: -0.5px; 
+        }
+
+        /* 링크복사, 캡쳐 버튼 특별 스타일 (연한 회색 + 입체감) */
+        .btn-light-gray {
+            flex: 1;
+            background-color: #d1d5db; /* 연한 회색 */
+            color: #1f2937; /* 글자 어둡게 */
+            box-shadow: 0 4px 0 #9ca3af; /* 입체감 그림자 */
+            font-size: 13px; font-weight: bold; letter-spacing: -0.5px; white-space: nowrap;
+        }
+        .btn-light-gray:active {
+            box-shadow: 0 0 0 #9ca3af;
+            transform: translateY(4px);
+        }
         
+        /* 검토 버튼 활성화 상태 (회색 톤 내에서 점멸) */
+        .btn-review.active { background-color: #9ca3af; color: #111827; animation: pulse 1.5s infinite; }
+
         .row-3, .row-4 { display: none; } /* 폴더 로드 전에 숨김 */
-        /* 카운터 박스 다크 모드 적용 */
-        .problem-counter-box { flex: 1.2; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: bold; align-self: stretch; background: #2d2d2d; border-radius: 6px; border: 1px solid #444; color: #f3f4f6; }
-        /* 입력창 다크 모드 적용 - 텍스트 입력 가능하도록 변경 */
+        
+        /* 카운터 박스 (4번째 줄 두께에 맞춤) */
+        .problem-counter-box { flex: 1.2; padding: 15px 2px; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: bold; align-self: stretch; background: #2d2d2d; border-radius: 6px; border: 1px solid #444; color: #f3f4f6; }
+        
         #problem-number-input { width: 45px; min-width: 0; padding: 4px 2px; text-align: center; font-size: 13px; font-weight: bold; border: 1px solid #555; border-radius: 5px; outline: none; background: #1f2937; color: #f3f4f6; }
-        #problem-number-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 2px rgba(79,70,229,0.3); }
+        #problem-number-input:focus { border-color: #4b5563; box-shadow: 0 0 0 2px rgba(156,163,175,0.3); }
         #problem-total { min-width: 16px; text-align: left; }
 
-        /* 수순 입력창 다크 모드 적용 */
+        /* 수순 입력창 (3번째 줄) */
         #move-input { width: 55px; flex-shrink: 0; text-align: center; font-size: 15px; font-weight: bold; border: 2px solid #555; border-radius: 6px; outline: none; background: #1f2937; color: #f3f4f6; }
-        #move-input:focus { border-color: #4f46e5; }
+        #move-input:focus { border-color: #9ca3af; }
 
         @keyframes pulse {
             0% { opacity: 1; }
@@ -82,15 +102,21 @@
             100% { opacity: 1; }
         }
 
-        /* 모바일 대응: 세로 배치로 변경 및 배경 검은색 유지 */
+        /* 모바일 대응 */
         @media (max-width: 800px) {
             body { padding: 0; background-color: #000000; align-items: flex-start; }
             .container { flex-direction: column; align-items: center; padding: 10px; border-radius: 0; box-shadow: none; gap: 15px; background: transparent; }
             #board-container { border-left: none; border-right: none; border-radius: 0; max-width: 100vw; flex: none; }
             .sidebar { flex: none; max-width: max(300px, calc(100vh - 220px)); }
-            .row-1 > button, .row-2 > button, .row-3 > button, .row-4 > button { font-size: 11px; padding: 8px 1px; }
-            .btn-folder-nav { font-size: 10px !important; padding: 8px 1px !important; letter-spacing: -1px; }
-            .problem-counter-box { padding: 4px 1px; font-size: 11px; flex: 1.2; }
+            
+            .row-top { gap: 6px; }
+            .btn-light-gray { font-size: 12px; }
+            .status-box { padding: 10px; font-size: 13px; }
+
+            .row-1 > button, .row-2 > button, .row-4 > button { font-size: 11px; padding: 10px 1px; }
+            
+            /* 모바일에서도 4번째 줄은 약간 더 두껍게 */
+            .row-3 > button, .problem-counter-box { font-size: 11px !important; padding: 12px 1px !important; letter-spacing: -1px; }
             #problem-number-input { width: 40px; font-size: 11px; padding: 2px 1px; }
             #problem-total { min-width: 16px; }
             #move-input { width: 45px; font-size: 13px; }
@@ -105,42 +131,49 @@
     </div>
 
     <div class="sidebar">
-        <div class="status-box">
-            <span id="turn-color" class="turn-indicator turn-B"></span>
-            <span id="status-text">대기 중</span>
+        <!-- 1번째 줄: 링크복사 / 상태창(흑차례) / 캡쳐 -->
+        <div class="row-top">
+            <button class="btn-light-gray" onclick="copyLink()">링크복사</button>
+            <div class="status-box">
+                <span id="turn-color" class="turn-indicator turn-B"></span>
+                <span id="status-text">대기 중</span>
+            </div>
+            <button class="btn-light-gray" onclick="captureBoard()">캡쳐</button>
         </div>
 
         <input type="file" id="sgf-file-input" accept=".sgf" style="display: none;" onchange="loadSGFFile(event)">
         <input type="file" id="sgf-folder-input" webkitdirectory directory multiple style="display: none;" onchange="loadSGFFolder(event)">
 
         <div class="controls-container">
+            <!-- 2번째 줄: 5개 버튼 -->
             <div class="row-1">
-                <button class="btn-primary" onclick="copyLink()">🔗 링크복사</button>
-                <button class="btn-download" onclick="downloadSGF()">💾 SGF저장</button>
-                <button class="btn-upload" onclick="document.getElementById('sgf-file-input').click()">📂 파일열기</button>
-                <button class="btn-upload-folder" onclick="document.getElementById('sgf-folder-input').click()">📁 폴더열기</button>
-                <button class="btn-info" onclick="toggleMoveNumbers()">🔢 수순보기</button>
+                <button id="btn-review" class="btn-review" onclick="toggleReviewMode()" title="E">검토</button>
+                <button onclick="downloadSGF()">SGF저장</button>
+                <button onclick="document.getElementById('sgf-file-input').click()">파일열기</button>
+                <button onclick="document.getElementById('sgf-folder-input').click()">폴더열기</button>
+                <button onclick="toggleMoveNumbers()">수순보기</button>
             </div>
+            <!-- 3번째 줄: 이전수 / 수순입력 / 다음수 -->
             <div class="row-2">
-                <button id="btn-prev-move" class="btn-nav" onclick="goPrevMove()" title="왼쪽 방향키 / S (항상 사용 가능)">◀</button>
+                <button id="btn-prev-move" onclick="goPrevMove()" title="왼쪽 방향키 / S (항상 사용 가능)">이전</button>
                 <input type="number" id="move-input" min="0" value="0" onkeydown="handleInputEnter(event)" onblur="jumpToMove()">
-                <button id="btn-next-move" class="btn-nav" onclick="goNextMove()" title="오른쪽 방향키 / F (항상 사용 가능)">▶</button>
-                <button id="btn-review" class="btn-review" onclick="toggleReviewMode()" title="E">🔍 검토</button>
-                <button class="btn-capture" onclick="captureBoard()">📸 캡쳐</button>
+                <button id="btn-next-move" onclick="goNextMove()" title="오른쪽 방향키 / F (항상 사용 가능)">다음</button>
             </div>
+            <!-- 4번째 줄 (폴더): 이전문제 / 이전장면 / 입력창 / 다음장면 / 다음문제 (두께 20% 증가됨) -->
             <div class="row-3" id="problem-nav">
-                <button id="btn-prev-problem" class="btn-folder-nav" onclick="prevProblem()" title="Shift+W / Shift+PageUp">⏮ 이전문제</button>
-                <button id="btn-prev-scene" class="btn-folder-nav" onclick="prevScene()" title="W / PageUp">◀ 이전장면</button>
+                <button id="btn-prev-problem" onclick="prevProblem()" title="Shift+W / Shift+PageUp">이전문제</button>
+                <button id="btn-prev-scene" onclick="prevScene()" title="W / PageUp">이전장면</button>
                 <div class="problem-counter-box" id="problem-counter" title="문제 번호를 클릭해서 직접 입력할 수 있습니다.">
                     <input type="text" id="problem-number-input" value="1-1" onkeydown="handleProblemInputEnter(event)" onblur="jumpToProblem()">
                     <span>/</span>
                     <span id="problem-total">0</span>
                 </div>
-                <button id="btn-next-scene" class="btn-folder-nav" onclick="nextScene()" title="R / PageDown">다음장면 ▶</button>
-                <button id="btn-next-problem" class="btn-folder-nav" onclick="nextProblem()" title="Shift+R / Shift+PageDown">다음문제 ⏭</button>
+                <button id="btn-next-scene" onclick="nextScene()" title="R / PageDown">다음장면</button>
+                <button id="btn-next-problem" onclick="nextProblem()" title="Shift+R / Shift+PageDown">다음문제</button>
             </div>
+            <!-- 5번째 줄 (폴더): 상세풀이 -->
             <div class="row-4" id="detail-nav">
-                <button id="btn-detail" class="btn-detail" onclick="openDetailSolution()" disabled title="현재 SGF에 상세풀이 URL이 없습니다.">📖 상세풀이</button>
+                <button id="btn-detail" onclick="openDetailSolution()" disabled title="현재 SGF에 상세풀이 URL이 없습니다.">상세풀이</button>
             </div>
         </div>
     </div>
@@ -218,7 +251,7 @@
         svg.innerHTML = html;
     }
 
-    // 해시 파싱 (URL에 s=, l=, sz= 파라미터가 띄어쓰기로 있을 경우 감지하여 셋업 변환)
+    // 해시 파싱
     function parseHashData(hashString) {
         let setupB = "", setupW = "", moves = "";
         let decoded = "";
@@ -229,7 +262,7 @@
 
         let s_val = -1;
         let l_val = -1;
-        let sz_val = 19; // 기본값 19
+        let sz_val = 19; 
 
         for (let i = 1; i < parts.length; i++) {
             if (parts[i].startsWith('s=')) s_val = parseInt(parts[i].substring(2));
@@ -237,7 +270,6 @@
             if (parts[i].startsWith('sz=')) sz_val = parseInt(parts[i].substring(3));
         }
 
-        // 기본 해시 파싱 (셋업과 수순 분리)
         if (baseHash.includes('B') || baseHash.includes('W') || baseHash.includes('_')) {
             let p = baseHash.split('_');
             let setupPart = p[0];
@@ -263,35 +295,29 @@
             moves = baseHash;
         }
 
-        // 흑/백 차례 계산을 위한 시작 순번 (기본 1번째 수는 흑)
         let startingMoveNum = 1;
 
-        // s와 l이 모두 있을 경우 수순 잘라내고 셋업으로 변환
         if (s_val > 0 && l_val > 0) {
             let setupCount = s_val - 1;
             if (setupCount > moves.length / 2) setupCount = moves.length / 2;
             
-            // 앞의 수순들을 흑/백 셋업으로 이동
             for (let i = 0; i < setupCount; i++) {
                 let coord = moves.substring(i * 2, i * 2 + 2);
                 if (i % 2 === 0) setupB += coord;
                 else setupW += coord;
             }
             
-            // 잘려나간 수순만큼 차례 오프셋 증가
             startingMoveNum = setupCount + 1;
 
             let endCount = l_val;
             if (endCount > moves.length / 2) endCount = moves.length / 2;
             
-            // 남은 수순 자르기
             moves = moves.substring(setupCount * 2, endCount * 2);
         }
 
         return { setupB, setupW, moves, s_val, l_val, sz_val, startingMoveNum };
     }
 
-    // 셋업과 순수 수순을 바탕으로 해시 문자열 생성 (크기 정보 sz 포함)
     function buildHash(setupB, setupW, moves, sz = 19) {
         let hash = "";
         if (setupB || setupW) {
@@ -312,7 +338,6 @@
         window.location.hash = newHash;
     }
 
-    // startingMoveNum을 이용해 정확한 돌의 색상과 차례 계산
     function computeBoardState(hashString, maxMoves, boardSize = 19) {
         let { setupB, setupW, moves, startingMoveNum, sz_val } = parseHashData(hashString); 
         let finalBoardSize = boardSize || sz_val || 19;
@@ -341,7 +366,6 @@
                 if (board[y][x] !== null) continue;
                 visualMoveNum++;
                 
-                // 원본 수순의 시작점(startingMoveNum)을 고려하여 색상 결정
                 let color = ((visualMoveNum - 1 + startingMoveNum - 1) % 2 === 0) ? 'B' : 'W';
                 board[y][x] = { color: color, moveNum: visualMoveNum };
                 lastX = x; lastY = y;
@@ -537,11 +561,11 @@
         }
         stonesGroup.innerHTML = html;
         
-        // 차례 텍스트 및 UI 업데이트
+        // 차례 텍스트 수정 ("흑차례" 또는 "백차례" 만 출력)
         let nextColor = ((moveCount + startingMoveNum - 1) % 2 === 0) ? 'B' : 'W';
         document.getElementById('turn-color').className = `turn-indicator turn-${nextColor}`;
         let modeText = isReviewMode ? "[검토중] " : "";
-        document.getElementById('status-text').innerText = `${modeText}${nextColor === 'B' ? '흑' : '백'}의 차례 (현재 ${moveCount}수)`;
+        document.getElementById('status-text').innerText = `${modeText}${nextColor === 'B' ? '흑' : '백'}차례`;
         document.getElementById('move-input').value = moveCount;
     }
 
@@ -585,7 +609,6 @@
             let nextMove = chars[gridX] + chars[gridY];
             let newMoves = moves + nextMove;
             
-            // 바둑판에 착수하여 새로운 분기를 만들 경우 s= 와 l= 효과는 해제되고 새로운 해시가 생성됨
             let newHash = buildHash(setupB, setupW, newMoves, bSize);
             
             if (isFolderMode) {
@@ -630,9 +653,8 @@
             }
             window.isSgfFileLoading = false;
         } else {
-            // URL 파라미터 s, l 유무에 따른 currentMoveIndex 결정
             if (s_val > 0 && l_val > 0) {
-                currentMoveIndex = 0; // 변환 후의 0번째 수 (즉 착수 전 장면) 표시로 수정
+                currentMoveIndex = 0; 
             } else if (s_val > 0) {
                 currentMoveIndex = s_val;
                 if (currentMoveIndex > moves.length / 2) currentMoveIndex = moves.length / 2;
@@ -674,7 +696,7 @@
                     : null
             };
             btn.classList.add('active');
-            btn.innerText = '🛑 검토 종료';
+            btn.innerText = '검토 종료';
 
             let currentHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
             let parsed = parseHashData(currentHash);
@@ -705,7 +727,7 @@
             }
             savedReviewState = null;
             btn.classList.remove('active');
-            btn.innerText = '🔍 검토';
+            btn.innerText = '검토';
         }
     }
 
@@ -770,7 +792,6 @@
         const canvas = document.createElement('canvas');
         canvas.width = size; canvas.height = size;
         const ctx = canvas.getContext('2d');
-        // 변경된 바둑판 단색 컬러와 동일하게 캡쳐 배경색 설정
         ctx.fillStyle = '#9e7646'; ctx.fillRect(0, 0, size, size);
         ctx.strokeStyle = '#523114'; ctx.lineWidth = 12; ctx.strokeRect(0, 0, size, size);
 
@@ -887,7 +908,6 @@
         let isProblem = problem_node.includes('AB[') || problem_node.includes('AW[');
         let flipX = false, flipY = false, isWhiteFirst = false;
 
-        // 파일열기는 원본 방향 유지. 폴더열기는 바둑판 크기를 벗어나지 않는 선에서 일부만 잘라낸 장면 변환.
         if (isProblem && !applyToUrl) {
             let allCoords = [];
             let coordRegex = /(AB|AW|AE|B|W|TB|TW|TR|SQ|CR|MA)((?:[\s]*\[[a-zA-Z]{2}\])+)/g;
@@ -912,12 +932,10 @@
                 let nearTopEdge = minY <= 3;
                 let nearBottomEdge = maxY >= (boardSize - 4);
 
-                // 바둑판 전체가 보이는 모양인지 판단
                 let isFullBoard = (nearLeftEdge && nearRightEdge) || 
                                   (nearTopEdge && nearBottomEdge) || 
                                   ((maxX - minX >= boardSize - 6) && (maxY - minY >= boardSize - 6));
 
-                // 바둑판의 일부만 잘라서 보여주는 경우에만 좌하방면으로 회전/대칭 이동
                 if (!isFullBoard) {
                     let avgX = allCoords.reduce((sum, c) => sum + c.x, 0) / allCoords.length;
                     let avgY = allCoords.reduce((sum, c) => sum + c.y, 0) / allCoords.length;
@@ -1204,7 +1222,7 @@
         isReviewMode = false;
         let btnReview = document.getElementById('btn-review');
         btnReview.classList.remove('active');
-        btnReview.innerText = '🔍 검토';
+        btnReview.innerText = '검토';
         savedReviewState = null;
 
         updateProblemCounter();
@@ -1326,12 +1344,10 @@
         let activeHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
         let { setupB, setupW, moves, startingMoveNum, sz_val } = parseHashData(activeHash);
         
-        // 다운로드 시 크기 정보 확인
         let bSize = (isFolderMode && folderProblems[currentFileIndex]) ? (folderProblems[currentFileIndex].boardSize || 19) : (sz_val || 19);
         
         let sgfContent = `(;GM[1]FF[4]SZ[${bSize}]`;
 
-        // 다운로드 시, URL의 s와 l에 의해 변환된 셋업 및 컷팅된 수순을 그대로 SGF로 만듦
         if (setupB.length > 0) {
             sgfContent += "AB";
             for (let i = 0; i < setupB.length; i += 2) sgfContent += `[${setupB.slice(i, i+2)}]`;
@@ -1341,7 +1357,6 @@
             for (let i = 0; i < setupW.length; i += 2) sgfContent += `[${setupW.slice(i, i+2)}]`;
         }
         
-        // 셋업 결과 백 차례로 시작될 경우 PL(Player to play) 속성 추가
         if (startingMoveNum % 2 === 0) {
             sgfContent += "PL[W]";
         }
@@ -1369,7 +1384,7 @@
                 let { moves, s_val, l_val } = parseHashData(currentHash);
                 
                 if (s_val > 0 && l_val > 0) {
-                    currentMoveIndex = 0; // 초기 화면을 착수 전(0수) 상태로 세팅
+                    currentMoveIndex = 0; 
                 } else if (s_val > 0) {
                     currentMoveIndex = s_val;
                     if (currentMoveIndex > moves.length / 2) currentMoveIndex = moves.length / 2;
