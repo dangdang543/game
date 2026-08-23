@@ -228,7 +228,7 @@
                 <button id="btn-prev-problem" onclick="prevProblem()" title="Shift+W / Shift+PageUp">이전문제</button>
                 <button id="btn-prev-scene" onclick="prevScene()" title="W / PageUp">이전장면</button>
                 <div class="problem-counter-box" id="problem-counter" title="문제 번호를 클릭해서 직접 입력할 수 있습니다.">
-                    <input type="text" id="problem-number-input" value="1-1" onkeydown="handleProblemInputEnter(event)" onblur="jumpToProblem()">
+                    <input type="text" id="problem-number-input" inputmode="numeric" pattern="[0-9]*" value="1-1" onfocus="this.value=''" onkeydown="handleProblemInputEnter(event)" onblur="jumpToProblem()">
                     <span>/</span>
                     <span id="problem-total">0</span>
                 </div>
