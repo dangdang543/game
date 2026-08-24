@@ -949,7 +949,18 @@
             ctx.drawImage(img, 0, 0, size, size);
             URL.revokeObjectURL(url);
             const a = document.createElement('a');
-            a.download = `baduk_capture_${new Date().toISOString().slice(0,10).replace(/-/g, "")}.png`;
+            
+            // 현지 시간을 기준으로 YYYYMMDD_HHMMSS 형태의 문자열 생성
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            const h = String(now.getHours()).padStart(2, '0');
+            const min = String(now.getMinutes()).padStart(2, '0');
+            const s = String(now.getSeconds()).padStart(2, '0');
+            const filename = `${y}${m}${d}_${h}${min}${s}.png`;
+            
+            a.download = filename;
             a.href = canvas.toDataURL('image/png');
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
         };
