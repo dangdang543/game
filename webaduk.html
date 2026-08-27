@@ -215,8 +215,9 @@
             <div class="row-move-control">
                 <button id="btn-prev-move" onclick="goPrevMove()" title="왼쪽 방향키 / S (항상 사용 가능)">◀</button>
                 <div class="center-controls">
-                    <!-- 클릭 시 지워지게 설정, 모바일 숫자 전용 키보드 표시 -->
+                    <!-- 클릭 시 지워지게 설정, 모바일 숫자 전용 키보드 표시 및 자동완성 팝업 방지 -->
                     <input type="number" id="move-input" inputmode="numeric" pattern="[0-9]*" min="0" value="0" 
+                           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                            onkeydown="handleInputEnter(event)" onfocus="this.value=''" onblur="jumpToMove()">
                     <button id="btn-memo-toggle" onclick="toggleMemo()">감상</button>
                 </div>
@@ -228,7 +229,10 @@
                 <button id="btn-prev-problem" onclick="prevProblem()" title="Shift+W / Shift+PageUp">이전문제</button>
                 <button id="btn-prev-scene" onclick="prevScene()" title="W / PageUp">이전장면</button>
                 <div class="problem-counter-box" id="problem-counter" title="문제 번호를 클릭해서 직접 입력할 수 있습니다.">
-                    <input type="text" id="problem-number-input" inputmode="numeric" pattern="[0-9]*" value="1-1" onfocus="this.value=''" onkeydown="handleProblemInputEnter(event)" onblur="jumpToProblem()">
+                    <!-- autocomplete="off" 추가로 이전 입력 추천 및 자동완성 팝업 방지 -->
+                    <input type="text" id="problem-number-input" inputmode="numeric" pattern="[0-9]*" value="1-1" 
+                           autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                           onfocus="this.value=''" onkeydown="handleProblemInputEnter(event)" onblur="jumpToProblem()">
                     <span>/</span>
                     <span id="problem-total">0</span>
                 </div>
