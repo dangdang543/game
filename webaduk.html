@@ -45,8 +45,8 @@
         /* 최상단 레이아웃 */
         .row-top { margin-bottom: 5px; }
         
-        /* 상태창 다크 모드 적용 */
-        .status-box { flex: 1.2; padding: 12px; background: #2d2d2d; border-radius: 6px; font-size: 15px; font-weight: bold; color: #f3f4f6; text-align: center; display: flex; align-items: center; justify-content: center; margin: 0; }
+        /* 상태창 다크 모드 적용 (min-width:0 추가로 팽창 방지) */
+        .status-box { flex: 1.2; padding: 12px; background: #2d2d2d; border-radius: 6px; font-size: 15px; font-weight: bold; color: #f3f4f6; text-align: center; display: flex; align-items: center; justify-content: center; margin: 0; min-width: 0; }
         .turn-indicator { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
         .turn-B { background: black; border: 1px solid #555; }
         .turn-W { background: white; border: 1px solid #ccc; }
@@ -62,20 +62,20 @@
         button:disabled { background-color: #4b5563; color: #9ca3af; cursor: not-allowed; opacity: 0.75; }
         button:disabled:active { transform: none; }
 
-        /* 버튼 기본 패딩 */
+        /* 버튼 기본 패딩 (min-width:0 및 자간 조정으로 정렬 완벽화) */
         .row-1 > button, .row-4 > button { 
-            flex: 1; padding: 12px 2px; font-size: 13px; font-weight: bold; white-space: nowrap; letter-spacing: -0.5px; 
+            flex: 1; padding: 12px 1px; font-size: 13px; font-weight: bold; white-space: nowrap; letter-spacing: -1px; min-width: 0; 
         }
 
-        /* 폴더 네비게이션 - 두께 20% 증가 */
+        /* 폴더 네비게이션 - 삐져나오지 않도록 여백/자간/폰트사이즈 최적화 */
         .row-3 > button { 
-            flex: 1; padding: 15px 2px; font-size: 12px; font-weight: bold; white-space: nowrap; letter-spacing: -0.5px; 
+            flex: 1; padding: 15px 1px; font-size: 12px; font-weight: bold; white-space: nowrap; letter-spacing: -1px; min-width: 0; 
         }
 
-        /* 링크복사, 캡쳐 버튼 특별 스타일 (연한 회색 + 입체감) */
+        /* 링크복사, 캡쳐 버튼 특별 스타일 */
         .btn-light-gray {
             flex: 1; background-color: #d1d5db; color: #1f2937; box-shadow: 0 4px 0 #9ca3af; 
-            font-size: 13px; font-weight: bold; letter-spacing: -0.5px; white-space: nowrap;
+            font-size: 13px; font-weight: bold; letter-spacing: -1px; white-space: nowrap; min-width: 0;
         }
         .btn-light-gray:active {
             box-shadow: 0 0 0 #9ca3af; transform: translateY(4px);
@@ -86,19 +86,19 @@
 
         .row-3, .row-4 { display: none; } /* 초기 숨김 */
         
-        /* 카운터 박스 */
-        .problem-counter-box { flex: 1.2; padding: 15px 2px; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: bold; align-self: stretch; background: #2d2d2d; border-radius: 6px; border: 1px solid #444; color: #f3f4f6; }
+        /* 카운터 박스 (여백 및 간격 축소) */
+        .problem-counter-box { flex: 1.2; padding: 15px 1px; display: flex; align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: bold; align-self: stretch; background: #2d2d2d; border-radius: 6px; border: 1px solid #444; color: #f3f4f6; min-width: 0; }
         
-        #problem-number-input { width: 45px; min-width: 0; padding: 4px 2px; text-align: center; font-size: 13px; font-weight: bold; border: 1px solid #555; border-radius: 5px; outline: none; background: #1f2937; color: #f3f4f6; }
-        #problem-number-input:focus { border-color: #4b5563; box-shadow: 0 0 0 2px rgba(156,163,175,0.3); }
-        #problem-total { min-width: 16px; text-align: left; }
+        /* 번호 입력창 (너비 45px -> 36px로 축소하여 줄 바꿈/오버플로우 방지) */
+        #problem-number-input { width: 36px; min-width: 0; padding: 4px 1px; text-align: center; font-size: 12px; font-weight: bold; border: 1px solid #555; border-radius: 5px; outline: none; background: #1f2937; color: #f3f4f6; }
+        #problem-total { min-width: 12px; text-align: left; }
 
         /* ================= 수순, 이전, 다음, 감상 통합 컨트롤 레이아웃 ================= */
         .row-move-control {
             display: flex; gap: 8px; width: 100%; align-items: stretch; justify-content: space-between;
         }
         .row-move-control > button {
-            flex: 1; padding: 0; font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: center;
+            flex: 1; padding: 0; font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: center; min-width: 0;
         }
         .center-controls {
             display: flex; flex-direction: column; gap: 4px; width: 55px; flex-shrink: 0;
