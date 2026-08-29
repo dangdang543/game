@@ -6,30 +6,35 @@
     <title>웹 바둑판</title>
     <style>
         * { box-sizing: border-box; }
-        /* 배경을 검은색으로, 기본 글자색을 밝은 색으로 변경 */
-        body { font-family: 'Malgun Gothic', sans-serif; background-color: #000000; color: #f3f4f6; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
-        
-        /* PC 및 Dex 화면: 가로 배치 (좌 바둑판, 우 사이드바) */
-        .container { 
-            background: #1a1a1a; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(255,255,255,0.05); 
-            display: flex; flex-direction: row; align-items: flex-start; justify-content: center; 
-            width: 100%; max-width: 1200px; gap: 30px;
+        /* 배경을 검은색으로, 기본 글자색을 밝은 색으로 변경. 화면 상하 꽉 차게 변경 */
+        body { 
+            font-family: 'Malgun Gothic', sans-serif; background-color: #000000; color: #f3f4f6; 
+            display: flex; align-items: center; justify-content: center; 
+            height: 100vh; margin: 0; padding: 0; overflow: hidden; 
         }
         
-        /* 바둑판 영역 */
+        /* PC 및 Dex 화면: 가로 배치 (좌 바둑판, 우 사이드바). 여백 제거 및 전체 높이 사용 */
+        .container { 
+            background: #1a1a1a; padding: 0; border-radius: 0; box-shadow: none; 
+            display: flex; flex-direction: row; align-items: center; justify-content: center; 
+            width: 100%; max-width: 100%; height: 100vh; gap: 30px;
+        }
+        
+        /* 바둑판 영역 - 상하 꽉 차게 최대화 */
         #board-container { 
             position: relative; aspect-ratio: 1 / 1; 
             background-color: #9e7646; 
             border: 5px solid #523114; 
             box-shadow: 0 15px 30px rgba(0,0,0,0.6), inset 0 0 25px rgba(0,0,0,0.3); 
-            cursor: pointer; border-radius: 6px; -webkit-user-select: none; user-select: none;
-            flex: 1 1 auto; max-width: calc(100vh - 80px); width: 100%;
+            cursor: pointer; border-radius: 0; -webkit-user-select: none; user-select: none;
+            flex: 0 0 auto; width: auto; height: 100vh; max-height: 100vh; max-width: calc(100vw - 380px);
         }
         svg { width: 100%; height: 100%; display: block; }
         
         /* 우측 사이드바 */
         .sidebar {
             flex: 0 0 320px; display: flex; flex-direction: column; gap: 15px; width: 100%;
+            padding: 20px 20px 20px 0; height: 100vh; overflow-y: auto; justify-content: center;
         }
 
         .controls-container { display: flex; flex-direction: column; gap: 10px; }
@@ -145,14 +150,15 @@
             100% { opacity: 1; }
         }
 
-        /* 모바일 대응 */
+        /* 모바일 대응 - 스크롤 및 배치 원상복구 */
         @media (max-width: 800px) {
-            body { padding: 0; background-color: #000000; align-items: flex-start; }
-            .container { flex-direction: column; align-items: center; padding: 10px; border-radius: 0; box-shadow: none; gap: 10px; background: transparent; }
+            body { padding: 0; background-color: #000000; align-items: flex-start; height: auto; overflow: visible; }
+            .container { flex-direction: column; align-items: center; padding: 10px; border-radius: 0; box-shadow: none; gap: 10px; background: transparent; height: auto; }
             
-            #board-container { border-left: none; border-right: none; border-radius: 0; max-width: 100vw; flex: none; width: 100%; order: 4; margin: 5px 0; }
+            #board-container { border-left: none; border-right: none; border-radius: 0; max-width: 100vw; height: auto; max-height: none; flex: none; width: 100%; order: 4; margin: 5px 0; }
             
             .sidebar, .controls-container { display: contents; }
+            .sidebar { padding: 0; height: auto; overflow-y: visible; justify-content: flex-start; }
 
             .row-top, .row-1, .row-3, .row-4, .row-move-control, #memo-container { 
                 max-width: max(300px, calc(100vh - 220px)); 
@@ -188,7 +194,6 @@
     </div>
 
     <div class="sidebar">
-        <!-- 링크복사 / 상태창(흑차례) / 캡쳐 -->
         <div class="row-top">
             <button class="btn-light-gray" onclick="copyLink()">링크복사</button>
             <div class="status-box">
@@ -202,7 +207,6 @@
         <input type="file" id="sgf-folder-input" webkitdirectory directory multiple style="display: none;" onchange="loadSGFFolder(event)">
 
         <div class="controls-container">
-            <!-- 기본 5개 메뉴 버튼 -->
             <div class="row-1">
                 <button onclick="toggleMoveNumbers()">수순보기</button>
                 <button onclick="downloadSGF()">SGF저장</button>
@@ -211,11 +215,9 @@
                 <button id="btn-review" class="btn-review" onclick="toggleReviewMode()" title="E">검토</button>
             </div>
             
-            <!-- 통합 이동 제어 (이전 / 수순+감상 / 다음) -->
             <div class="row-move-control">
                 <button id="btn-prev-move" onclick="goPrevMove()" title="왼쪽 방향키 / S (항상 사용 가능)">◀</button>
                 <div class="center-controls">
-                    <!-- 클릭 시 지워지게 설정, 모바일 숫자 전용 키보드 표시 및 자동완성 팝업 방지 -->
                     <input type="number" id="move-input" inputmode="numeric" pattern="[0-9]*" min="0" value="0" 
                            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                            onkeydown="handleInputEnter(event)" onfocus="this.value=''" onblur="jumpToMove()">
@@ -224,12 +226,10 @@
                 <button id="btn-next-move" onclick="goNextMove()" title="오른쪽 방향키 / F (항상 사용 가능)">▶</button>
             </div>
             
-            <!-- 폴더: 네비게이션 -->
             <div class="row-3" id="problem-nav">
                 <button id="btn-prev-problem" onclick="prevProblem()" title="Shift+W / Shift+PageUp">이전문제</button>
                 <button id="btn-prev-scene" onclick="prevScene()" title="W / PageUp">이전장면</button>
                 <div class="problem-counter-box" id="problem-counter" title="문제 번호를 클릭해서 직접 입력할 수 있습니다.">
-                    <!-- autocomplete="off" 추가로 이전 입력 추천 및 자동완성 팝업 방지 -->
                     <input type="text" id="problem-number-input" inputmode="numeric" pattern="[0-9]*" value="1-1" 
                            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                            onfocus="this.value=''" onkeydown="handleProblemInputEnter(event)" onblur="jumpToProblem()">
@@ -240,12 +240,10 @@
                 <button id="btn-next-problem" onclick="nextProblem()" title="Shift+R / Shift+PageDown">다음문제</button>
             </div>
             
-            <!-- 폴더: 상세풀이 -->
             <div class="row-4" id="detail-nav">
                 <button id="btn-detail" onclick="openDetailSolution()" disabled title="현재 SGF에 상세풀이 URL이 없습니다.">상세풀이</button>
             </div>
 
-            <!-- 메모창 (바둑판 전체 폭) -->
             <div id="memo-container">
                 <div id="memo-header" onclick="toggleMemo()">
                     <span id="memo-title">감상</span>
