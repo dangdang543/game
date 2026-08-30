@@ -672,6 +672,10 @@
         drawBoardGrid(bSize);
         applyBoardViewBox();
 
+        // 장면의 마지막 수순인지 확인 (검토 모드가 아닐 때, 기보의 끝 수순과 일치할 경우)
+        let maxMoves = parsed.moves.length / 2;
+        let isFinalMoveOfScene = (!isReviewMode && currentMoveIndex === maxMoves && currentMoveIndex > 0);
+
         let { board, moveCount, lastX, lastY, startingMoveNum } = computeBoardState(hash, currentMoveIndex, bSize);
         let stonesGroup = document.getElementById('stones');
         let html = '';
@@ -691,11 +695,21 @@
 
                     if (showMoveNumbers && stone.moveNum > 0) {
                         let textColor = stone.color === 'B' ? 'white' : 'black';
+                        // 마지막 수순인 경우 수순 숫자를 빨간색으로 변경
+                        if (isLast && isFinalMoveOfScene) {
+                            textColor = '#ff3333';
+                        }
                         let fontSize = stone.moveNum >= 100 ? 9 : 10;
                         html += `<text x="${cx}" y="${cy}" fill="${textColor}" font-size="${fontSize}" text-anchor="middle" dominant-baseline="central" font-family="Arial, sans-serif" style="text-shadow: 0px 1px 2px rgba(0,0,0,0.4);">${stone.moveNum}</text>`;
                     } else if (isLast && !showMoveNumbers) {
                         let markerColor = stone.color === 'B' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.7)';
-                        html += `<circle cx="${cx}" cy="${cy}" r="2.5" fill="${markerColor}"/>`;
+                        let markerRadius = 2.5;
+                        // 마지막 수순인 경우 빨간색 점으로 강조 표시
+                        if (isFinalMoveOfScene) {
+                            markerColor = '#ff3333';
+                            markerRadius = 3.5;
+                        }
+                        html += `<circle cx="${cx}" cy="${cy}" r="${markerRadius}" fill="${markerColor}"/>`;
                     }
                 }
             }
@@ -814,12 +828,31 @@
     });
 
     function toggleMoveNumbers() { showMoveNumbers = !showMoveNumbers; render(); }
-    function goPrevMove() { if (currentMoveIndex > 0) { currentMoveIndex--; render(); } }
+    
+    // 왼쪽 화살표/이전 버튼 클릭 시: 첫 수순(0)이면 이전 장면의 맨 마지막 수순으로 이동
+    function goPrevMove() { 
+        if (currentMoveIndex > 0) { 
+            currentMoveIndex--; 
+            render(); 
+        } else if (isFolderMode) {
+            prevScene(true); // true 전달하여 로드 후 마지막 수순으로 바로 점프
+        }
+    }
+    
+    // 오른쪽 화살표/다음 버튼 클릭 시: 마지막 수순이면 다음 장면으로 이동
     function goNextMove() {
         let activeHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
         let { moves } = parseHashData(activeHash);
-        if (currentMoveIndex < moves.length / 2) { currentMoveIndex++; render(); }
+        let maxMoves = moves.length / 2;
+        
+        if (currentMoveIndex < maxMoves) { 
+            currentMoveIndex++; 
+            render(); 
+        } else if (isFolderMode) {
+            nextScene();
+        }
     }
+    
     function handleInputEnter(e) { if (e.key === 'Enter') document.getElementById('move-input').blur(); }
     
     // 수순창에서 값을 입력하고 벗어났을 때의 처리 (빈 값이면 원상복구)
@@ -1208,9 +1241,11 @@
         updateDetailButton();
     }
 
-    function prevScene() {
+    // 인자 jumpToEnd를 받아 파일 로드 시 수순의 끝으로 이동할지를 결정하도록 수정
+    function prevScene(jumpToEnd = false) {
         if (!isFolderMode || folderProblems.length === 0) return;
-        if (currentFileIndex > 0) loadSgfFromFileList(currentFileIndex - 1);
+        let isJump = jumpToEnd === true;
+        if (currentFileIndex > 0) loadSgfFromFileList(currentFileIndex - 1, isJump);
         else alert("첫 번째 장면입니다.");
     }
 
@@ -1270,7 +1305,8 @@
         }
     }
 
-    function loadSgfFromFileList(index) {
+    // isJump가 참이면 문제 여부와 무관하게 마지막 수순으로 배치
+    function loadSgfFromFileList(index, isJump = false) {
         if (index < 0 || index >= folderProblems.length) return;
         currentFileIndex = index;
         const problem = folderProblems[currentFileIndex];
@@ -1279,8 +1315,13 @@
         
         let { moves } = parseHashData(currentFolderHash);
         
-        if (problem.isProblem) currentMoveIndex = 0;
-        else currentMoveIndex = moves.length / 2;
+        if (isJump) {
+            currentMoveIndex = moves.length / 2;
+        } else if (problem.isProblem) {
+            currentMoveIndex = 0;
+        } else {
+            currentMoveIndex = moves.length / 2;
+        }
         
         isReviewMode = false;
         let btnReview = document.getElementById('btn-review');
