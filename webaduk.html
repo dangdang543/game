@@ -496,6 +496,8 @@
         let finalBoardSize = boardSize || sz_val || 19;
 
         let board = Array(finalBoardSize).fill(null).map(() => Array(finalBoardSize).fill(null));
+        // 각 좌표마다 착수되었던 돌들의 히스토리(순서, 색상, 수순 번호)를 저장
+        let moveHistory = Array(finalBoardSize).fill(null).map(() => Array(finalBoardSize).fill(null).map(() => []));
         
         if(maxMoves !== undefined) {
             moves = moves.substring(0, maxMoves * 2);
@@ -503,11 +505,17 @@
 
         for (let i = 0; i < setupB.length; i += 2) {
             let x = chars.indexOf(setupB[i]), y = chars.indexOf(setupB[i+1]);
-            if (x >= 0 && x < finalBoardSize && y >= 0 && y < finalBoardSize) board[y][x] = { color: 'B', moveNum: 0 };
+            if (x >= 0 && x < finalBoardSize && y >= 0 && y < finalBoardSize) {
+                board[y][x] = { color: 'B', moveNum: 0 };
+                moveHistory[y][x].push({ color: 'B', moveNum: 0 });
+            }
         }
         for (let i = 0; i < setupW.length; i += 2) {
             let x = chars.indexOf(setupW[i]), y = chars.indexOf(setupW[i+1]);
-            if (x >= 0 && x < finalBoardSize && y >= 0 && y < finalBoardSize) board[y][x] = { color: 'W', moveNum: 0 };
+            if (x >= 0 && x < finalBoardSize && y >= 0 && y < finalBoardSize) {
+                board[y][x] = { color: 'W', moveNum: 0 };
+                moveHistory[y][x].push({ color: 'W', moveNum: 0 });
+            }
         }
 
         let visualMoveNum = 0;
@@ -521,6 +529,7 @@
                 
                 let color = ((visualMoveNum - 1 + startingMoveNum - 1) % 2 === 0) ? 'B' : 'W';
                 board[y][x] = { color: color, moveNum: visualMoveNum };
+                moveHistory[y][x].push({ color: color, moveNum: visualMoveNum });
                 lastX = x; lastY = y;
 
                 let opponent = color === 'B' ? 'W' : 'B';
@@ -541,7 +550,10 @@
                             });
                         }
                         dfs(nx, ny);
-                        if (liberties.size === 0) group.forEach(p => { board[p.y][p.x] = null; });
+                        if (liberties.size === 0) group.forEach(p => { 
+                            board[p.y][p.x] = null; 
+                            // 돌이 따먹혀도 moveHistory 에는 기록이 유지됩니다.
+                        });
                     }
                 });
                 
@@ -559,12 +571,13 @@
                 dfsOwn(x, y);
                 if (ownLiberties.size === 0) { 
                     board[y][x] = null; 
+                    moveHistory[y][x].pop(); // 자충수로 취소된 경우 히스토리에서도 제거
                     visualMoveNum--; 
                     if(i === moves.length - 2) { lastX = -1; lastY = -1; } 
                 }
             }
         }
-        return { board, moveCount: visualMoveNum, lastX, lastY, startingMoveNum };
+        return { board, moveCount: visualMoveNum, lastX, lastY, startingMoveNum, moveHistory };
     }
 
     function getProblemViewBox(hashString) {
@@ -676,17 +689,19 @@
         let maxMoves = parsed.moves.length / 2;
         let isFinalMoveOfScene = (!isReviewMode && currentMoveIndex === maxMoves && currentMoveIndex > 0);
 
-        let { board, moveCount, lastX, lastY, startingMoveNum } = computeBoardState(hash, currentMoveIndex, bSize);
+        let { board, moveCount, lastX, lastY, startingMoveNum, moveHistory } = computeBoardState(hash, currentMoveIndex, bSize);
         let stonesGroup = document.getElementById('stones');
         let html = '';
+        let overlapTexts = []; // 바둑판 하단에 표시될 중복 수순 텍스트 배열
         
         for (let y = 0; y < bSize; y++) {
             for (let x = 0; x < bSize; x++) {
-                if (board[y][x] !== null) {
-                    let stone = board[y][x];
-                    let cx = pad + x * step, cy = pad + y * step;
-                    let isLast = (x === lastX && y === lastY);
-                    
+                let stone = board[y][x];
+                let history = moveHistory[y][x];
+                let cx = pad + x * step, cy = pad + y * step;
+                let isLast = (x === lastX && y === lastY);
+
+                if (stone !== null) {
                     if (stone.color === 'B') {
                         html += `<circle cx="${cx}" cy="${cy}" r="9.3" fill="url(#grad-black)" filter="url(#stone-shadow)"/>`;
                     } else {
@@ -711,9 +726,42 @@
                         }
                         html += `<circle cx="${cx}" cy="${cy}" r="${markerRadius}" fill="${markerColor}"/>`;
                     }
+                } else {
+                    // 따먹혀서 바둑판에 돌이 없는 경우라도 수순 보기 상태일 때 히스토리가 있으면 숫자를 표시
+                    if (showMoveNumbers && history.length > 0) {
+                        let lastHist = history[history.length - 1];
+                        if (lastHist.moveNum > 0) {
+                            let fontSize = lastHist.moveNum >= 100 ? 9 : 10;
+                            // 바둑판 선 위에서도 잘 보이도록 하얀색 테두리를 입혀서 표시
+                            html += `<text x="${cx}" y="${cy}" fill="#111111" font-size="${fontSize}" font-weight="bold" text-anchor="middle" dominant-baseline="central" font-family="Arial, sans-serif" stroke="#ffffff" stroke-width="2" paint-order="stroke">${lastHist.moveNum}</text>`;
+                        }
+                    }
+                }
+
+                // 한 교차점에 여러 번 착수된 경우 (돌이 따먹히고 다시 놓인 경우 등)
+                if (showMoveNumbers && history.length > 1) {
+                    let playedMoves = history.filter(m => m.moveNum > 0);
+                    if (playedMoves.length > 1) {
+                        // 예: 흑5= 백7 포맷팅
+                        let text = playedMoves.map(m => (m.color === 'B' ? '흑' : '백') + m.moveNum).join('= ');
+                        overlapTexts.push(text);
+                    }
                 }
             }
         }
+        
+        // 중복 착수 정보가 있을 경우 SVG 화면 최하단(바둑판 1선 아랫쪽 여백)에 한 줄로 표시
+        if (showMoveNumbers && overlapTexts.length > 0) {
+            let overlapString = overlapTexts.join(', ');
+            let vb = svg.getAttribute('viewBox');
+            if (vb) {
+                let [vbX, vbY, vbW, vbH] = vb.split(' ').map(Number);
+                let textX = vbX + 5;
+                let textY = vbY + vbH - 4; // 화면 제일 아랫쪽으로 배치
+                html += `<text x="${textX}" y="${textY}" fill="#111111" font-size="10" font-weight="bold" font-family="Arial, sans-serif" text-anchor="start" stroke="#ffffff" stroke-width="1.5" paint-order="stroke">${overlapString}</text>`;
+            }
+        }
+
         stonesGroup.innerHTML = html;
         
         let nextColor = ((moveCount + startingMoveNum - 1) % 2 === 0) ? 'B' : 'W';
