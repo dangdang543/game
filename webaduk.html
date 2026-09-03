@@ -242,6 +242,9 @@
             
             <div class="row-4" id="detail-nav">
                 <button id="btn-detail" onclick="openDetailSolution()" disabled title="현재 SGF에 상세풀이 URL이 없습니다.">상세풀이</button>
+                <button id="btn-register-problem" onclick="toggleRegisterProblem()" title="현재 문제를 오답노트에 등록/해제합니다.">문제등록</button>
+                <button id="btn-call-registered" onclick="toggleCallRegistered()" title="등록된 오답문제만 모아서 봅니다.">등록호출</button>
+                <button id="btn-save-redirect" onclick="saveRedirectHtml()" title="현재 링크를 복사하고 바로 열리는 html파일을 저장합니다.">저장</button>
             </div>
 
             <div id="memo-container">
@@ -276,6 +279,11 @@
     // 폴더 내 문제 관리 변수
     const FOLDER_URL_PREFIX = 'FOLDER1:';
     let folderProblems = [];
+    let allFolderProblems = []; // 마스터 문제 목록
+    let currentFolderName = ''; // 호출된 폴더 이름
+    let registeredFileNums = new Set(); // 등록된 문제 번호 집합
+    let isRegisteredOnlyMode = false; // 등록 문제만 보는 모드 여부
+
     let currentFileIndex = -1;
     let isFolderMode = false;
     let currentFolderHash = '';
@@ -496,7 +504,6 @@
         let finalBoardSize = boardSize || sz_val || 19;
 
         let board = Array(finalBoardSize).fill(null).map(() => Array(finalBoardSize).fill(null));
-        // 각 좌표마다 착수되었던 돌들의 히스토리(순서, 색상, 수순 번호)를 저장
         let moveHistory = Array(finalBoardSize).fill(null).map(() => Array(finalBoardSize).fill(null).map(() => []));
         
         if(maxMoves !== undefined) {
@@ -552,7 +559,6 @@
                         dfs(nx, ny);
                         if (liberties.size === 0) group.forEach(p => { 
                             board[p.y][p.x] = null; 
-                            // 돌이 따먹혀도 moveHistory 에는 기록이 유지됩니다.
                         });
                     }
                 });
@@ -571,7 +577,7 @@
                 dfsOwn(x, y);
                 if (ownLiberties.size === 0) { 
                     board[y][x] = null; 
-                    moveHistory[y][x].pop(); // 자충수로 취소된 경우 히스토리에서도 제거
+                    moveHistory[y][x].pop(); 
                     visualMoveNum--; 
                     if(i === moves.length - 2) { lastX = -1; lastY = -1; } 
                 }
@@ -685,14 +691,13 @@
         drawBoardGrid(bSize);
         applyBoardViewBox();
 
-        // 장면의 마지막 수순인지 확인 (검토 모드가 아닐 때, 기보의 끝 수순과 일치할 경우)
         let maxMoves = parsed.moves.length / 2;
         let isFinalMoveOfScene = (!isReviewMode && currentMoveIndex === maxMoves && currentMoveIndex > 0);
 
         let { board, moveCount, lastX, lastY, startingMoveNum, moveHistory } = computeBoardState(hash, currentMoveIndex, bSize);
         let stonesGroup = document.getElementById('stones');
         let html = '';
-        let overlapTexts = []; // 바둑판 하단에 표시될 중복 수순 텍스트 배열
+        let overlapTexts = []; 
         
         for (let y = 0; y < bSize; y++) {
             for (let x = 0; x < bSize; x++) {
@@ -710,7 +715,6 @@
 
                     if (showMoveNumbers && stone.moveNum > 0) {
                         let textColor = stone.color === 'B' ? 'white' : 'black';
-                        // 마지막 수순인 경우 수순 숫자를 빨간색으로 변경
                         if (isLast && isFinalMoveOfScene) {
                             textColor = '#ff3333';
                         }
@@ -719,7 +723,6 @@
                     } else if (isLast && !showMoveNumbers) {
                         let markerColor = stone.color === 'B' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.7)';
                         let markerRadius = 2.5;
-                        // 마지막 수순인 경우 빨간색 점으로 강조 표시
                         if (isFinalMoveOfScene) {
                             markerColor = '#ff3333';
                             markerRadius = 3.5;
@@ -727,22 +730,18 @@
                         html += `<circle cx="${cx}" cy="${cy}" r="${markerRadius}" fill="${markerColor}"/>`;
                     }
                 } else {
-                    // 따먹혀서 바둑판에 돌이 없는 경우라도 수순 보기 상태일 때 히스토리가 있으면 숫자를 표시
                     if (showMoveNumbers && history.length > 0) {
                         let lastHist = history[history.length - 1];
                         if (lastHist.moveNum > 0) {
                             let fontSize = lastHist.moveNum >= 100 ? 9 : 10;
-                            // 바둑판 선 위에서도 잘 보이도록 하얀색 테두리를 입혀서 표시
                             html += `<text x="${cx}" y="${cy}" fill="#111111" font-size="${fontSize}" font-weight="bold" text-anchor="middle" dominant-baseline="central" font-family="Arial, sans-serif" stroke="#ffffff" stroke-width="2" paint-order="stroke">${lastHist.moveNum}</text>`;
                         }
                     }
                 }
 
-                // 한 교차점에 여러 번 착수된 경우 (돌이 따먹히고 다시 놓인 경우 등)
                 if (showMoveNumbers && history.length > 1) {
                     let playedMoves = history.filter(m => m.moveNum > 0);
                     if (playedMoves.length > 1) {
-                        // 예: 흑5= 백7 포맷팅
                         let text = playedMoves.map(m => (m.color === 'B' ? '흑' : '백') + m.moveNum).join('= ');
                         overlapTexts.push(text);
                     }
@@ -750,14 +749,13 @@
             }
         }
         
-        // 중복 착수 정보가 있을 경우 SVG 화면 최하단(바둑판 1선 아랫쪽 여백)에 한 줄로 표시
         if (showMoveNumbers && overlapTexts.length > 0) {
             let overlapString = overlapTexts.join(', ');
             let vb = svg.getAttribute('viewBox');
             if (vb) {
                 let [vbX, vbY, vbW, vbH] = vb.split(' ').map(Number);
                 let textX = vbX + 5;
-                let textY = vbY + vbH - 4; // 화면 제일 아랫쪽으로 배치
+                let textY = vbY + vbH - 4; 
                 html += `<text x="${textX}" y="${textY}" fill="#111111" font-size="10" font-weight="bold" font-family="Arial, sans-serif" text-anchor="start" stroke="#ffffff" stroke-width="1.5" paint-order="stroke">${overlapString}</text>`;
             }
         }
@@ -836,7 +834,9 @@
         }
 
         isFolderMode = false;
+        currentFolderName = '';
         folderProblems = [];
+        allFolderProblems = [];
         currentFileIndex = -1;
         currentFolderHash = '';
         currentFolderViewBox = '0 0 400 400';
@@ -857,7 +857,7 @@
         } else {
             if (s_val > 0 && l_val > 0) {
                 currentMoveIndex = 0; 
-            } else if (s_val >= 0) {  // 수순 0일 때 저장 및 로딩 대응
+            } else if (s_val >= 0) {  
                 currentMoveIndex = s_val;
                 if (currentMoveIndex > moves.length / 2) currentMoveIndex = moves.length / 2;
             } else {
@@ -877,17 +877,15 @@
 
     function toggleMoveNumbers() { showMoveNumbers = !showMoveNumbers; render(); }
     
-    // 왼쪽 화살표/이전 버튼 클릭 시: 첫 수순(0)이면 이전 장면의 맨 마지막 수순으로 이동
     function goPrevMove() { 
         if (currentMoveIndex > 0) { 
             currentMoveIndex--; 
             render(); 
         } else if (isFolderMode) {
-            prevScene(true); // true 전달하여 로드 후 마지막 수순으로 바로 점프
+            prevScene(true); 
         }
     }
     
-    // 오른쪽 화살표/다음 버튼 클릭 시: 마지막 수순이면 다음 장면으로 이동
     function goNextMove() {
         let activeHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
         let { moves } = parseHashData(activeHash);
@@ -903,7 +901,6 @@
     
     function handleInputEnter(e) { if (e.key === 'Enter') document.getElementById('move-input').blur(); }
     
-    // 수순창에서 값을 입력하고 벗어났을 때의 처리 (빈 값이면 원상복구)
     function jumpToMove() {
         let targetMove = parseInt(document.getElementById('move-input').value);
         let activeHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
@@ -1033,7 +1030,6 @@
             URL.revokeObjectURL(url);
             const a = document.createElement('a');
             
-            // 현지 시간을 기준으로 YYYYMMDD_HHMMSS 형태의 문자열 생성
             const now = new Date();
             const y = now.getFullYear();
             const m = String(now.getMonth() + 1).padStart(2, '0');
@@ -1076,6 +1072,8 @@
 
         detailButton.disabled = !detailUrl;
         detailButton.title = detailUrl ? `상세풀이 열기: ${detailUrl}` : '현재 SGF에 상세풀이 URL이 없습니다.';
+        
+        updateRegisterButtonsUI();
     }
 
     function openDetailSolution() {
@@ -1090,6 +1088,124 @@
             console.error(error); alert('상세풀이 URL 형식이 올바르지 않습니다.');
         }
     }
+
+    // ==================== 오답문제 등록 및 호출 기능 ====================
+    function loadRegisteredProblemsForCurrentFolder() {
+        registeredFileNums.clear();
+        if (allFolderProblems.length === 0) return;
+        let key = "webaduk_reg_" + allFolderProblems.length + "_" + (allFolderProblems[0].hash ? allFolderProblems[0].hash.substring(0, 20) : "");
+        try {
+            let saved = localStorage.getItem(key);
+            if (saved) {
+                let arr = JSON.parse(saved);
+                if (Array.isArray(arr)) {
+                    arr.forEach(num => registeredFileNums.add(num));
+                }
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    function saveRegisteredProblemsForCurrentFolder() {
+        if (allFolderProblems.length === 0) return;
+        let key = "webaduk_reg_" + allFolderProblems.length + "_" + (allFolderProblems[0].hash ? allFolderProblems[0].hash.substring(0, 20) : "");
+        try {
+            localStorage.setItem(key, JSON.stringify(Array.from(registeredFileNums)));
+        } catch(e) { console.error(e); }
+    }
+
+    function toggleRegisterProblem() {
+        if (!isFolderMode || folderProblems.length === 0 || !folderProblems[currentFileIndex]) return;
+        const currentBranch = folderProblems[currentFileIndex];
+        const fileNum = getFileNum(currentBranch.branchLabel);
+
+        if (registeredFileNums.has(fileNum)) {
+            registeredFileNums.delete(fileNum);
+        } else {
+            registeredFileNums.add(fileNum);
+        }
+
+        saveRegisteredProblemsForCurrentFolder();
+
+        if (isRegisteredOnlyMode) {
+            folderProblems = allFolderProblems.filter(p => registeredFileNums.has(getFileNum(p.branchLabel)));
+            if (folderProblems.length === 0) {
+                alert("등록된 오답문제가 더 이상 없습니다. 전체 목록으로 돌아갑니다.");
+                toggleCallRegistered();
+                return;
+            }
+            let newIndex = folderProblems.findIndex(p => getFileNum(p.branchLabel) === fileNum);
+            if (newIndex === -1) newIndex = 0;
+            loadSgfFromFileList(newIndex);
+        } else {
+            updateRegisterButtonsUI();
+        }
+    }
+
+    function toggleCallRegistered() {
+        if (!isFolderMode || allFolderProblems.length === 0) return;
+
+        if (!isRegisteredOnlyMode) {
+            if (registeredFileNums.size === 0) {
+                alert("등록된 오답문제가 없습니다. 먼저 '문제등록' 버튼으로 문제를 등록해주세요.");
+                return;
+            }
+            isRegisteredOnlyMode = true;
+            const currentFileNum = folderProblems[currentFileIndex] ? getFileNum(folderProblems[currentFileIndex].branchLabel) : null;
+            folderProblems = allFolderProblems.filter(p => registeredFileNums.has(getFileNum(p.branchLabel)));
+            
+            let targetIndex = folderProblems.findIndex(p => getFileNum(p.branchLabel) === currentFileNum);
+            if (targetIndex === -1) targetIndex = 0;
+            loadSgfFromFileList(targetIndex);
+        } else {
+            isRegisteredOnlyMode = false;
+            const currentBranchLabel = folderProblems[currentFileIndex] ? folderProblems[currentFileIndex].branchLabel : null;
+            folderProblems = [...allFolderProblems];
+            
+            let targetIndex = folderProblems.findIndex(p => p.branchLabel === currentBranchLabel);
+            if (targetIndex === -1) targetIndex = 0;
+            loadSgfFromFileList(targetIndex);
+        }
+    }
+
+    function updateRegisterButtonsUI() {
+        const btnRegister = document.getElementById('btn-register-problem');
+        const btnCall = document.getElementById('btn-call-registered');
+        if (!btnRegister || !btnCall) return;
+
+        if (!isFolderMode || folderProblems.length === 0) {
+            btnRegister.style.backgroundColor = '';
+            btnCall.style.backgroundColor = '';
+            btnCall.innerText = '등록호출';
+            return;
+        }
+
+        const currentBranch = folderProblems[currentFileIndex];
+        const currentFileNum = currentBranch ? getFileNum(currentBranch.branchLabel) : null;
+        const isRegistered = currentFileNum !== null && registeredFileNums.has(currentFileNum);
+
+        if (isRegistered) {
+            btnRegister.style.backgroundColor = '#2563eb'; // 활성화 강조 (파란색)
+            btnRegister.style.color = '#ffffff';
+            btnRegister.title = `문제 ${currentFileNum}번이 오답목록에 등록되어 있습니다. (클릭시 해제)`;
+        } else {
+            btnRegister.style.backgroundColor = '#6b7280'; // 기본 회색
+            btnRegister.style.color = '#ffffff';
+            btnRegister.title = `현재 문제(${currentFileNum}번)를 오답목록에 등록합니다.`;
+        }
+
+        if (isRegisteredOnlyMode) {
+            btnCall.style.backgroundColor = '#d97706'; // 등록 모드 강조 (주황색)
+            btnCall.style.color = '#ffffff';
+            btnCall.innerText = '전체호출';
+            btnCall.title = '전체 문제 목록으로 돌아갑니다.';
+        } else {
+            btnCall.style.backgroundColor = '#6b7280';
+            btnCall.style.color = '#ffffff';
+            btnCall.innerText = '등록호출';
+            btnCall.title = `등록된 오답문제만 모아서 봅니다. (${registeredFileNums.size}개 문제 등록됨)`;
+        }
+    }
+    // ====================================================================
 
     function processSgfContent(content, applyToUrl = true, fileNameIndex = 1) {
         let boardSize = 19;
@@ -1237,6 +1353,7 @@
 
         if (applyToUrl) {
             isFolderMode = false;
+            currentFolderName = '';
             window.isSgfFileLoading = true;
             window.loadedSgfIsProblem = isProblem;
             window.location.hash = bestHash;
@@ -1265,7 +1382,8 @@
     function getFolderUrlHash() {
         const payload = {
             version: 1,
-            files: folderProblems.map(problem => ({
+            folderName: currentFolderName || '',
+            files: allFolderProblems.map(problem => ({
                 name: problem.name, hash: problem.hash, isProblem: !!problem.isProblem, boardSize: problem.boardSize || 19, detailUrl: problem.detailUrl || '', branchLabel: problem.branchLabel || ''
             }))
         };
@@ -1289,7 +1407,6 @@
         updateDetailButton();
     }
 
-    // 인자 jumpToEnd를 받아 파일 로드 시 수순의 끝으로 이동할지를 결정하도록 수정
     function prevScene(jumpToEnd = false) {
         if (!isFolderMode || folderProblems.length === 0) return;
         let isJump = jumpToEnd === true;
@@ -1311,23 +1428,33 @@
     function prevProblem() {
         if (!isFolderMode || folderProblems.length === 0) return;
         let currentFileNum = getFileNum(folderProblems[currentFileIndex].branchLabel);
-        let targetFileNum = currentFileNum - 1;
 
-        if (targetFileNum > 0) {
-            let targetIndex = folderProblems.findIndex(p => getFileNum(p.branchLabel) === targetFileNum);
-            if (targetIndex !== -1) { loadSgfFromFileList(targetIndex); return; }
+        let targetIndex = -1;
+        for (let i = currentFileIndex - 1; i >= 0; i--) {
+            if (getFileNum(folderProblems[i].branchLabel) < currentFileNum) {
+                let prevFileNum = getFileNum(folderProblems[i].branchLabel);
+                targetIndex = folderProblems.findIndex(p => getFileNum(p.branchLabel) === prevFileNum);
+                break;
+            }
         }
-        alert("첫 번째 문제입니다.");
+
+        if (targetIndex !== -1) {
+            loadSgfFromFileList(targetIndex);
+        } else {
+            alert("첫 번째 문제입니다.");
+        }
     }
 
     function nextProblem() {
         if (!isFolderMode || folderProblems.length === 0) return;
         let currentFileNum = getFileNum(folderProblems[currentFileIndex].branchLabel);
-        let targetFileNum = currentFileNum + 1;
 
-        let targetIndex = folderProblems.findIndex(p => getFileNum(p.branchLabel) === targetFileNum);
-        if (targetIndex !== -1) loadSgfFromFileList(targetIndex);
-        else alert("마지막 문제입니다.");
+        let targetIndex = folderProblems.findIndex(p => getFileNum(p.branchLabel) > currentFileNum);
+        if (targetIndex !== -1) {
+            loadSgfFromFileList(targetIndex);
+        } else {
+            alert("마지막 문제입니다.");
+        }
     }
 
     function handleProblemInputEnter(e) { if (e.key === 'Enter') document.getElementById('problem-number-input').blur(); }
@@ -1353,7 +1480,6 @@
         }
     }
 
-    // isJump가 참이면 문제 여부와 무관하게 마지막 수순으로 배치
     function loadSgfFromFileList(index, isJump = false) {
         if (index < 0 || index >= folderProblems.length) return;
         currentFileIndex = index;
@@ -1378,8 +1504,10 @@
 
         updateProblemCounter();
         
-        const newUrlHash = getFolderUrlHash();
-        history.replaceState(null, null, '#' + newUrlHash);
+        if (!isRegisteredOnlyMode) {
+            const newUrlHash = getFolderUrlHash();
+            history.replaceState(null, null, '#' + newUrlHash);
+        }
         
         render();
     }
@@ -1392,7 +1520,11 @@
                 const payload = decodeFolderPayload(encoded);
                 
                 if (payload.version === 1 && Array.isArray(payload.files)) {
+                    currentFolderName = payload.folderName || '';
                     folderProblems = payload.files;
+                    allFolderProblems = [...folderProblems];
+                    isRegisteredOnlyMode = false;
+                    loadRegisteredProblemsForCurrentFolder();
                     isFolderMode = true;
                     document.getElementById('problem-nav').style.display = 'flex';
                     document.getElementById('detail-nav').style.display = 'flex';
@@ -1411,6 +1543,12 @@
         const files = Array.from(event.target.files).filter(file => file.name.toLowerCase().endsWith('.sgf'));
         if (files.length === 0) { alert("선택된 폴더에 SGF 파일이 없습니다."); return; }
         
+        if (files[0] && files[0].webkitRelativePath) {
+            currentFolderName = files[0].webkitRelativePath.split('/')[0];
+        } else {
+            currentFolderName = "폴더기보";
+        }
+
         files.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
         folderProblems = [];
         let filesProcessed = 0;
@@ -1444,6 +1582,9 @@
         });
 
         if (folderProblems.length > 0) {
+            allFolderProblems = [...folderProblems];
+            isRegisteredOnlyMode = false;
+            loadRegisteredProblemsForCurrentFolder();
             isFolderMode = true;
             document.getElementById('problem-nav').style.display = 'flex';
             document.getElementById('detail-nav').style.display = 'flex';
@@ -1491,6 +1632,59 @@
         finally { document.body.removeChild(textArea); }
     }
 
+    // ==================== 리다이렉트 HTML 저장 기능 ====================
+    function getFolderName() {
+        if (currentFolderName && currentFolderName.trim() !== '') {
+            return currentFolderName.trim();
+        }
+        return 'baduk_link';
+    }
+
+    async function saveRedirectHtml() {
+        let currentUrl = window.location.href;
+
+        // 1. 현재 링크 클립보드 복사
+        try {
+            await navigator.clipboard.writeText(currentUrl);
+            alert('링크가 클립보드에 복사되었으며, 바로 열리는 html 파일 저장을 시작합니다.');
+        } catch (err) {
+            fallbackCopyLink(currentUrl);
+        }
+
+        // 2. 파일명 결정 (호출된 폴더 이름 적용)
+        let folderName = getFolderName();
+        let safeFileName = folderName.replace(/[/\\?%*:|"<>]/g, '_').trim();
+        if (!safeFileName) safeFileName = 'baduk_link';
+        let fileName = safeFileName.endsWith('.html') ? safeFileName : `${safeFileName}.html`;
+
+        // 3. 접속 시 복사된 링크로 즉시 이동하는 HTML 파일 내용 생성
+        let htmlContent = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="0; url=${currentUrl}">
+    <title>${folderName}</title>
+    <script>
+        window.location.href = ${JSON.stringify(currentUrl)};
+    <\/script>
+</head>
+<body>
+    <p>페이지로 이동 중입니다... <a href="${currentUrl}">여기를 클릭하세요</a></p>
+</body>
+</html>`;
+
+        // 4. HTML 파일 저장 (다운로드)
+        let blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+        let a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+    }
+    // ====================================================================
+
     function downloadSGF() {
         let activeHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
         let { setupB, setupW, moves, startingMoveNum, sz_val } = parseHashData(activeHash);
@@ -1532,7 +1726,7 @@
                 
                 if (s_val > 0 && l_val > 0) {
                     currentMoveIndex = 0; 
-                } else if (s_val >= 0) { // 수순 0일 때 저장 및 로딩 대응
+                } else if (s_val >= 0) { 
                     currentMoveIndex = s_val;
                     if (currentMoveIndex > moves.length / 2) currentMoveIndex = moves.length / 2;
                 } else {
