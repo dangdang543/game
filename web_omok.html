@@ -35,14 +35,15 @@
             width: 100%;
         }
 
+        /* 오목판 영역 디자인 수정 (webaduk_memo 질감 반영) */
         #board-container {
             position: relative;
             width: 85vh;
             max-width: 70vw;
             aspect-ratio: 1 / 1;
-            background-color: #e6b873;
-            border: 4px solid #111;
-            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5);
+            background-color: #9e7646;
+            border: 5px solid #523114;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.6), inset 0 0 25px rgba(0,0,0,0.3);
             cursor: pointer;
             border-radius: 4px;
             -webkit-user-select: none;
@@ -261,21 +262,40 @@
     }
 
     function initBoardLayout() {
-        let html = '<g id="grid-lines">';
+        // webaduk_memo의 필터, 그라디언트 질감 반영
+        let html = `
+        <defs>
+            <filter id="stone-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                <feDropShadow dx="1.5" dy="2.5" stdDeviation="1.5" flood-color="#000" flood-opacity="0.45"/>
+            </filter>
+            <radialGradient id="grad-black" cx="30%" cy="30%" r="70%">
+                <stop offset="0%" stop-color="#777" />
+                <stop offset="30%" stop-color="#222" />
+                <stop offset="100%" stop-color="#050505" />
+            </radialGradient>
+            <radialGradient id="grad-white" cx="30%" cy="30%" r="70%">
+                <stop offset="0%" stop-color="#fff" />
+                <stop offset="70%" stop-color="#e3e3e3" />
+                <stop offset="100%" stop-color="#b3b3b3" />
+            </radialGradient>
+        </defs>
+        <g id="grid-lines">`;
 
+        // 선 색상 변경 (#444 -> #331e0b)
         for (let i = 0; i < size; i++) {
             const pos = pad + i * step;
-            html += `<line x1="${pad}" y1="${pos}" x2="${pad + (size - 1) * step}" y2="${pos}" stroke="#444" stroke-width="0.8"/>`;
-            html += `<line x1="${pos}" y1="${pad}" x2="${pos}" y2="${pad + (size - 1) * step}" stroke="#444" stroke-width="0.8"/>`;
+            html += `<line x1="${pad}" y1="${pos}" x2="${pad + (size - 1) * step}" y2="${pos}" stroke="#331e0b" stroke-width="0.8"/>`;
+            html += `<line x1="${pos}" y1="${pad}" x2="${pos}" y2="${pad + (size - 1) * step}" stroke="#331e0b" stroke-width="0.8"/>`;
         }
 
         const center = 7;
         const side = 3;
         const stars = [side, center, size - 1 - side];
 
+        // 화점 색상 및 크기 변경 (#222 -> #221105, r="2.5")
         stars.forEach(cx => {
             stars.forEach(cy => {
-                html += `<circle cx="${pad + cx * step}" cy="${pad + cy * step}" r="2.2" fill="#222"/>`;
+                html += `<circle cx="${pad + cx * step}" cy="${pad + cy * step}" r="2.5" fill="#221105"/>`;
             });
         });
 
@@ -525,21 +545,22 @@
                 const cy = pad + y * step;
                 const isLast = x === state.lastX && y === state.lastY;
 
+                // 바둑돌 질감 및 텍스트 스타일 변경 적용
                 if (cell.color === 'B') {
-                    html += `<circle cx="${cx}" cy="${cy}" r="9" fill="#111" stroke="#000" stroke-width="0.5"/>`;
+                    html += `<circle cx="${cx}" cy="${cy}" r="9.3" fill="url(#grad-black)" filter="url(#stone-shadow)"/>`;
 
                     if (showMoveNumbers) {
-                        html += `<text x="${cx}" y="${cy}" fill="#fff" font-size="8.5" font-family="Arial" font-weight="bold" text-anchor="middle" dominant-baseline="central" dy="0.5">${cell.no}</text>`;
+                        html += `<text x="${cx}" y="${cy}" fill="white" font-size="8.5" font-family="Arial" font-weight="bold" text-anchor="middle" dominant-baseline="central" dy="0.5" style="text-shadow: 0px 1px 2px rgba(0,0,0,0.6);">${cell.no}</text>`;
                     } else if (isLast) {
-                        html += `<circle cx="${cx}" cy="${cy}" r="2.5" fill="#ef4444"/>`;
+                        html += `<circle cx="${cx}" cy="${cy}" r="3" fill="#ef4444"/>`;
                     }
                 } else {
-                    html += `<circle cx="${cx}" cy="${cy}" r="9" fill="#fff" stroke="#888" stroke-width="0.8"/>`;
+                    html += `<circle cx="${cx}" cy="${cy}" r="9.3" fill="url(#grad-white)" filter="url(#stone-shadow)"/>`;
 
                     if (showMoveNumbers) {
-                        html += `<text x="${cx}" y="${cy}" fill="#000" font-size="8.5" font-family="Arial" font-weight="bold" text-anchor="middle" dominant-baseline="central" dy="0.5">${cell.no}</text>`;
+                        html += `<text x="${cx}" y="${cy}" fill="black" font-size="8.5" font-family="Arial" font-weight="bold" text-anchor="middle" dominant-baseline="central" dy="0.5" style="text-shadow: 0px 1px 2px rgba(255,255,255,0.6);">${cell.no}</text>`;
                     } else if (isLast) {
-                        html += `<circle cx="${cx}" cy="${cy}" r="2.5" fill="#ef4444"/>`;
+                        html += `<circle cx="${cx}" cy="${cy}" r="3" fill="#ef4444"/>`;
                     }
                 }
             }
@@ -676,8 +697,9 @@
         canvas.width = size; canvas.height = size;
         const ctx = canvas.getContext('2d');
         
-        ctx.fillStyle = '#e6b873'; ctx.fillRect(0, 0, size, size);
-        ctx.strokeStyle = '#111'; ctx.lineWidth = 16; ctx.strokeRect(0, 0, size, size);
+        // 캡쳐 이미지 배경색 및 테두리 색상 수정
+        ctx.fillStyle = '#9e7646'; ctx.fillRect(0, 0, size, size);
+        ctx.strokeStyle = '#523114'; ctx.lineWidth = 16; ctx.strokeRect(0, 0, size, size);
 
         const img = new Image();
         const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
