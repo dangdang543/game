@@ -273,6 +273,12 @@
 
     let internalHashChange = false;
 
+    // 네이버 카페 일대일 채팅창에서 붙는 &close=Y 제거용 헬퍼 함수
+    function getCleanHash() {
+        let hash = window.location.hash.substring(1);
+        return hash ? hash.replace(/&close=Y$/i, '') : '';
+    }
+
     // 폴더 내 문제 관리 변수
     const FOLDER_URL_PREFIX = 'FOLDER1:';
     let folderProblems = [];
@@ -300,7 +306,7 @@
         if (container.classList.contains('open')) {
             closeMemo(null);
         } else {
-            let currentHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
+            let currentHash = isFolderMode ? currentFolderHash : getCleanHash();
             let { memo } = parseHashData(currentHash);
             document.getElementById('memo-content').value = memo || "";
             container.classList.add('open');
@@ -317,7 +323,7 @@
         if (event) event.stopPropagation();
         let newMemo = document.getElementById('memo-content').value.trim();
         
-        let currentHash = window.location.hash.substring(1);
+        let currentHash = getCleanHash();
         let parsed = parseHashData(currentHash);
         
         let newHash = buildHash(parsed.setupB, parsed.setupW, parsed.moves, parsed.sz_val, currentMoveIndex, newMemo);
@@ -384,6 +390,10 @@
 
     // 해시 파싱
     function parseHashData(hashString) {
+        if (typeof hashString === 'string') {
+            hashString = hashString.replace(/&close=Y$/i, '');
+        }
+
         let setupB = "", setupW = "", moves = "";
         let s_val = -1, l_val = -1, sz_val = 19, memo = "";
 
@@ -664,7 +674,7 @@
         if (isFolderMode) {
             svg.setAttribute('viewBox', currentFolderViewBox);
         } else {
-            let hash = window.location.hash.substring(1);
+            let hash = getCleanHash();
             let { sz_val } = parseHashData(hash);
             let bSize = sz_val || 19;
             if (bSize !== 19) {
@@ -678,7 +688,7 @@
 
     function render() {
         let activeProblem = (isFolderMode && folderProblems[currentFileIndex]) ? folderProblems[currentFileIndex] : null;
-        let hash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
+        let hash = isFolderMode ? currentFolderHash : getCleanHash();
         let parsed = parseHashData(hash);
         let bSize = activeProblem ? (activeProblem.boardSize || 19) : (parsed.sz_val || 19);
 
@@ -750,86 +760,17 @@
             }
         }
         
-        // ================= 중복 착수 정보 하단 다중 라인 동적 배치 로직 =================
+        // 중복 착수 정보가 있을 경우 SVG 화면 최하단(바둑판 1선 아랫쪽 여백)에 한 줄로 표시
         if (showMoveNumbers && overlapTexts.length > 0) {
+            let overlapString = overlapTexts.join(', ');
             let vb = svg.getAttribute('viewBox');
             if (vb) {
                 let [vbX, vbY, vbW, vbH] = vb.split(' ').map(Number);
                 let textX = vbX + 5;
-                let textY = vbY + vbH - 4; // 화면 제일 아랫쪽 기준점
-                
-                let overlapString = overlapTexts.join(', ');
-                let lines = [];
-                let fontSize = 10;
-                let strokeWidth = 1.5;
-                
-                // 글자 수 기반으로 화면에 들어갈 수 있는 한계 계산 (폰트 사이즈의 ~65%를 한 글자 너비로 가정)
-                let maxCharsPerLine = Math.floor(vbW / (fontSize * 0.65));
-                
-                if (overlapString.length <= maxCharsPerLine) {
-                    lines = [overlapString]; // 1줄로 표시 가능
-                } else {
-                    // 글자 크기를 줄여서 2줄로 배치 시도
-                    fontSize = 7.5;
-                    strokeWidth = 1.2;
-                    maxCharsPerLine = Math.floor(vbW / (fontSize * 0.65));
-                    
-                    let currentLine = "";
-                    for (let i = 0; i < overlapTexts.length; i++) {
-                        let text = overlapTexts[i];
-                        let addText = (i === overlapTexts.length - 1) ? text : text + ',';
-                        
-                        if (currentLine.length === 0) {
-                            currentLine = addText;
-                        } else if (currentLine.length + addText.length + 1 <= maxCharsPerLine) {
-                            currentLine += ' ' + addText;
-                        } else {
-                            lines.push(currentLine);
-                            currentLine = addText;
-                        }
-                    }
-                    if (currentLine) lines.push(currentLine);
-                    
-                    // 2줄을 초과한다면 글자 크기를 더 작게 하여 3줄로 분할
-                    if (lines.length > 2) {
-                        fontSize = 5.5;
-                        strokeWidth = 1.0;
-                        maxCharsPerLine = Math.floor(vbW / (fontSize * 0.65));
-                        lines = [];
-                        currentLine = "";
-                        
-                        for (let i = 0; i < overlapTexts.length; i++) {
-                            let text = overlapTexts[i];
-                            let addText = (i === overlapTexts.length - 1) ? text : text + ',';
-                            
-                            if (currentLine.length === 0) {
-                                currentLine = addText;
-                            } else if (currentLine.length + addText.length + 1 <= maxCharsPerLine) {
-                                currentLine += ' ' + addText;
-                            } else {
-                                lines.push(currentLine);
-                                currentLine = addText;
-                            }
-                        }
-                        if (currentLine) lines.push(currentLine);
-                    }
-                }
-                
-                // 만약 여전히 3줄을 초과할 정도로 극단적으로 길다면 3줄에 억지로 병합 (정보 누락 방지)
-                if (lines.length > 3) {
-                    let lastLine = lines.slice(2).join(' ');
-                    lines = [lines[0], lines[1], lastLine];
-                }
-                
-                // 계산된 라인 수만큼 텍스트 그리기 (하단 기준점에서 위로 쌓음)
-                let lineHeight = fontSize * 1.3; 
-                for (let i = 0; i < lines.length; i++) {
-                    let y = textY - ((lines.length - 1 - i) * lineHeight);
-                    html += `<text x="${textX}" y="${y}" fill="#111111" font-size="${fontSize}" font-weight="bold" font-family="Arial, sans-serif" text-anchor="start" stroke="#ffffff" stroke-width="${strokeWidth}" paint-order="stroke">${lines[i]}</text>`;
-                }
+                let textY = vbY + vbH - 4; // 화면 제일 아랫쪽으로 배치
+                html += `<text x="${textX}" y="${textY}" fill="#111111" font-size="10" font-weight="bold" font-family="Arial, sans-serif" text-anchor="start" stroke="#ffffff" stroke-width="1.5" paint-order="stroke">${overlapString}</text>`;
             }
         }
-        // =========================================================================
 
         stonesGroup.innerHTML = html;
         
@@ -864,7 +805,7 @@
         let gridY = Math.round((svgPoint.y - pad) / step);
 
         let activeProblem = (isFolderMode && folderProblems[currentFileIndex]) ? folderProblems[currentFileIndex] : null;
-        let currentHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
+        let currentHash = isFolderMode ? currentFolderHash : getCleanHash();
         let parsedHash = parseHashData(currentHash);
         let bSize = activeProblem ? (activeProblem.boardSize || 19) : (parsedHash.sz_val || 19);
 
@@ -913,7 +854,7 @@
         document.getElementById('detail-nav').style.display = 'none';
         updateMemoButtonVisibility();
 
-        let currentHash = window.location.hash.substring(1);
+        let currentHash = getCleanHash();
         let { moves, s_val, l_val, memo } = parseHashData(currentHash);
 
         if (window.isSgfFileLoading) {
@@ -958,7 +899,7 @@
     
     // 오른쪽 화살표/다음 버튼 클릭 시: 마지막 수순이면 다음 장면으로 이동
     function goNextMove() {
-        let activeHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
+        let activeHash = isFolderMode ? currentFolderHash : getCleanHash();
         let { moves } = parseHashData(activeHash);
         let maxMoves = moves.length / 2;
         
@@ -975,7 +916,7 @@
     // 수순창에서 값을 입력하고 벗어났을 때의 처리 (빈 값이면 원상복구)
     function jumpToMove() {
         let targetMove = parseInt(document.getElementById('move-input').value);
-        let activeHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
+        let activeHash = isFolderMode ? currentFolderHash : getCleanHash();
         let { moves } = parseHashData(activeHash);
         let maxMoves = moves.length / 2;
         
@@ -993,7 +934,7 @@
 
         if (isReviewMode) {
             savedReviewState = {
-                hash: isFolderMode ? currentFolderHash : window.location.hash.substring(1),
+                hash: isFolderMode ? currentFolderHash : getCleanHash(),
                 index: currentMoveIndex,
                 folderProblemHash: isFolderMode && folderProblems[currentFileIndex]
                     ? folderProblems[currentFileIndex].hash
@@ -1002,7 +943,7 @@
             btn.classList.add('active');
             btn.innerText = '검토 종료';
 
-            let currentHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
+            let currentHash = isFolderMode ? currentFolderHash : getCleanHash();
             let parsed = parseHashData(currentHash);
             let bSize = (isFolderMode && folderProblems[currentFileIndex]) ? (folderProblems[currentFileIndex].boardSize || 19) : (parsed.sz_val || 19);
 
@@ -1454,7 +1395,7 @@
     }
 
     function loadFolderFromUrl() {
-        const hash = window.location.hash.substring(1);
+        const hash = getCleanHash();
         if (hash.startsWith(FOLDER_URL_PREFIX)) {
             try {
                 const encoded = hash.substring(FOLDER_URL_PREFIX.length);
@@ -1561,7 +1502,7 @@
     }
 
     function downloadSGF() {
-        let activeHash = isFolderMode ? currentFolderHash : window.location.hash.substring(1);
+        let activeHash = isFolderMode ? currentFolderHash : getCleanHash();
         let { setupB, setupW, moves, startingMoveNum, sz_val } = parseHashData(activeHash);
         
         let bSize = (isFolderMode && folderProblems[currentFileIndex]) ? (folderProblems[currentFileIndex].boardSize || 19) : (sz_val || 19);
@@ -1595,8 +1536,8 @@
         if (!loadFolderFromUrl()) {
             isFolderMode = false;
             updateMemoButtonVisibility();
-            if (window.location.hash) {
-                let currentHash = window.location.hash.substring(1);
+            let currentHash = getCleanHash();
+            if (currentHash) {
                 let { moves, s_val, l_val, memo } = parseHashData(currentHash);
                 
                 if (s_val > 0 && l_val > 0) {
