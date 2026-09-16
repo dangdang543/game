@@ -388,7 +388,7 @@
         svg.innerHTML = html;
     }
 
-    // 해시 파싱
+    // 해시 파싱 (수순 분할 및 사석 처리 포함)
     function parseHashData(hashString) {
         if (typeof hashString === 'string') {
             hashString = hashString.replace(/&close=Y$/i, '');
@@ -457,13 +457,83 @@
             let setupCount = s_val - 1;
             if (setupCount > moves.length / 2) setupCount = moves.length / 2;
             
+            let sz = sz_val || 19;
+            let tempBoard = Array(sz).fill(null).map(() => Array(sz).fill(null));
+            
+            for (let i = 0; i < setupB.length; i += 2) {
+                let x = chars.indexOf(setupB[i]), y = chars.indexOf(setupB[i+1]);
+                if (x >= 0 && x < sz && y >= 0 && y < sz) tempBoard[y][x] = 'B';
+            }
+            for (let i = 0; i < setupW.length; i += 2) {
+                let x = chars.indexOf(setupW[i]), y = chars.indexOf(setupW[i+1]);
+                if (x >= 0 && x < sz && y >= 0 && y < sz) tempBoard[y][x] = 'W';
+            }
+
+            let dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+            let visualNum = 0;
+
+            // 1수부터 s_val - 1수까지 배치하며 사석 처리 (따내기, 자충수)
             for (let i = 0; i < setupCount; i++) {
                 let coord = moves.substring(i * 2, i * 2 + 2);
-                if (i % 2 === 0) setupB += coord;
-                else setupW += coord;
+                let x = chars.indexOf(coord[0]), y = chars.indexOf(coord[1]);
+                if (x >= 0 && x < sz && y >= 0 && y < sz) {
+                    if (tempBoard[y][x] !== null) continue;
+                    visualNum++;
+                    let color = (visualNum % 2 !== 0) ? 'B' : 'W';
+                    tempBoard[y][x] = color;
+                    
+                    let opponent = color === 'B' ? 'W' : 'B';
+                    dirs.forEach(([dx, dy]) => {
+                        let nx = x + dx, ny = y + dy;
+                        if (nx >= 0 && nx < sz && ny >= 0 && ny < sz && tempBoard[ny][nx] === opponent) {
+                            let group = [], liberties = new Set(), visited = Array(sz).fill(false).map(() => Array(sz).fill(false));
+                            function dfs(cx, cy) {
+                                visited[cy][cx] = true; group.push({x: cx, y: cy});
+                                dirs.forEach(([idx, idy]) => {
+                                    let nnx = cx + idx, nny = cy + idy;
+                                    if (nnx >= 0 && nnx < sz && nny >= 0 && nny < sz) {
+                                        if (tempBoard[nny][nnx] === null) liberties.add(`${nnx},${nny}`);
+                                        else if (tempBoard[nny][nnx] === opponent && !visited[nny][nnx]) dfs(nnx, nny);
+                                    }
+                                });
+                            }
+                            dfs(nx, ny);
+                            if (liberties.size === 0) group.forEach(p => { tempBoard[p.y][p.x] = null; });
+                        }
+                    });
+                    
+                    let ownLiberties = new Set(), ownVisited = Array(sz).fill(false).map(() => Array(sz).fill(false));
+                    function dfsOwn(cx, cy) {
+                        ownVisited[cy][cx] = true;
+                        dirs.forEach(([idx, idy]) => {
+                            let nnx = cx + idx, nny = cy + idy;
+                            if (nnx >= 0 && nnx < sz && nny >= 0 && nny < sz) {
+                                if (tempBoard[nny][nnx] === null) ownLiberties.add(`${nnx},${nny}`);
+                                else if (tempBoard[nny][nnx] === color && !ownVisited[nny][nnx]) dfsOwn(nnx, nny);
+                            }
+                        });
+                    }
+                    dfsOwn(x, y);
+                    if (ownLiberties.size === 0) {
+                        tempBoard[y][x] = null;
+                        visualNum--;
+                    }
+                }
             }
+
+            let newSetupB = "", newSetupW = "";
+            for (let y = 0; y < sz; y++) {
+                for (let x = 0; x < sz; x++) {
+                    if (tempBoard[y][x] === 'B') newSetupB += chars[x] + chars[y];
+                    else if (tempBoard[y][x] === 'W') newSetupW += chars[x] + chars[y];
+                }
+            }
+
+            setupB = newSetupB;
+            setupW = newSetupW;
             
-            startingMoveNum = setupCount + 1;
+            // s_val수 부터의 정확한 흑백 차례를 위해 실제로 유효 착수된 돌의 개수에 맞춤
+            startingMoveNum = visualNum + 1;
 
             let endCount = l_val;
             if (endCount > moves.length / 2) endCount = moves.length / 2;
