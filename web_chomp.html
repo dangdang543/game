@@ -222,32 +222,56 @@
 <script>
     const chars = 'abcdefghijklmno';
     let ROWS = 7, COLS = 7;
-    let gameMode = 'PVP';
+    let gameMode = 'PVP'; // 'PVP' 또는 'PVC'
     let currentMoveIndex = 0;
     let isReviewMode = false;
     let savedReviewState = null;
     let memo = new Map();
+    let aiTimer = null;
 
     function startNewGame(mode) {
-        ROWS = Math.min(parseInt(document.getElementById('rows').value), 7);
-        COLS = Math.min(parseInt(document.getElementById('cols').value), 7);
-        gameMode = mode;
+        if (aiTimer) {
+            clearTimeout(aiTimer);
+            aiTimer = null;
+        }
+        memo.clear();
         
-        // Hash 초기화: r{rows}c{cols}_ 형식
-        window.location.hash = `r${ROWS}c${COLS}_`;
+        let rVal = parseInt(document.getElementById('rows').value) || 7;
+        let cVal = parseInt(document.getElementById('cols').value) || 7;
+        ROWS = Math.min(Math.max(rVal, 2), 7);
+        COLS = Math.min(Math.max(cVal, 2), 7);
+        
+        gameMode = mode;
+        currentMoveIndex = 0;
+        isReviewMode = false;
+        
+        let btnReview = document.getElementById('btn-review');
+        if (btnReview) {
+            btnReview.classList.remove('active');
+            btnReview.innerText = '🔍 검토';
+        }
+
+        setHash(ROWS, COLS, gameMode, '');
+    }
+
+    function setHash(r, c, mode, moves) {
+        let tag = (mode === 'PVC') ? 'pvc_' : 'pvp_';
+        window.location.hash = `r${r}c${c}_${tag}${moves}`;
     }
 
     function parseHash() {
         let hash = window.location.hash.substring(1);
         if (!hash) return null;
 
-        let match = hash.match(/^r(\d)c(\d)_(.*)$/);
+        // r{rows}c{cols}_[pvc_|pvp_]moves 형식 파싱
+        let match = hash.match(/^r(\d)c(\d)_(?:(pvc|pvp)_)?([a-o]*)$/i);
         if (!match) return null;
 
         return {
-            rows: parseInt(match[1]),
-            cols: parseInt(match[2]),
-            moves: match[3].replace(/[^a-o]/g, '')
+            rows: Math.min(Math.max(parseInt(match[1]), 2), 7),
+            cols: Math.min(Math.max(parseInt(match[2]), 2), 7),
+            mode: match[3] ? match[3].toUpperCase() : null,
+            moves: match[4].replace(/[^a-o]/g, '')
         };
     }
 
@@ -275,7 +299,7 @@
 
             if (r < 0 || r >= rows || c < 0 || c >= cols || eaten[r][c]) break;
 
-            // Chomp 적용
+            // Chomp 규칙 적용 (선택한 칸의 위쪽과 오른쪽 모두 제거)
             for (let tr = 0; tr <= r; tr++) {
                 for (let tc = c; tc < cols; tc++) {
                     eaten[tr][tc] = true;
@@ -284,13 +308,22 @@
 
             moveCount++;
 
+            // 독초(왼쪽 아래) 먹음 여부 확인
             if (r === rows - 1 && c === 0) {
                 gameOver = true;
-                loser = moveCount % 2 === 1 ? 1 : 2; // 독초를 먹은 플레이어 패배
+                loser = (moveCount % 2 === 1) ? 1 : 2;
             }
         }
 
-        return { rows, cols, eaten, moveCount, gameOver, loser, fullMovesLen: parsed.moves.length / 2 };
+        return { 
+            rows, 
+            cols, 
+            eaten, 
+            moveCount, 
+            gameOver, 
+            loser, 
+            fullMovesLen: parsed.moves.length / 2 
+        };
     }
 
     function render() {
@@ -306,6 +339,14 @@
 
         ROWS = parsed.rows;
         COLS = parsed.cols;
+        if (parsed.mode) {
+            gameMode = parsed.mode;
+        }
+
+        let maxMoves = parsed.moves.length / 2;
+        if (currentMoveIndex > maxMoves) {
+            currentMoveIndex = maxMoves;
+        }
 
         let state = computeState(parsed, currentMoveIndex);
         
@@ -328,23 +369,37 @@
         updateStatus(state);
         document.getElementById('move-input').value = currentMoveIndex;
 
-        // PVC 모드일 때 AI 턴 자동 실행
+        // 기존 대기 중인 AI 타이머가 있다면 취소
+        if (aiTimer) {
+            clearTimeout(aiTimer);
+            aiTimer = null;
+        }
+
+        // PVC 모드에서 AI 턴 실행조건 검증
         if (gameMode === 'PVC' && !state.gameOver && currentMoveIndex === state.fullMovesLen && (currentMoveIndex % 2 === 1)) {
-            document.getElementById('status-text').innerText = "AI 계산 중...";
-            setTimeout(() => proComputerTurn(state), 300);
+            document.getElementById('status-text').innerText = "🤖 AI 생각 중...";
+            aiTimer = setTimeout(() => {
+                proComputerTurn();
+            }, 400);
         }
     }
 
     function handleChomp(r, c) {
         let parsed = parseHash();
-        let state = computeState(parsed, currentMoveIndex);
+        if (!parsed) return;
 
-        if (state.gameOver || state.eaten[r][c]) return;
-        if (gameMode === 'PVC' && currentMoveIndex % 2 === 1) return; // AI 순서 시 반응 안 함
+        let state = computeState(parsed, currentMoveIndex);
+        if (!state || state.gameOver || state.eaten[r][c]) return;
+
+        // AI 턴 계산 중일 때 플레이어 입력 차단
+        if (gameMode === 'PVC' && currentMoveIndex % 2 === 1 && currentMoveIndex === state.fullMovesLen) {
+            return;
+        }
 
         let moves = parsed.moves.substring(0, currentMoveIndex * 2);
         let nextMove = chars[r] + chars[c];
-        window.location.hash = `r${ROWS}c${COLS}_` + moves + nextMove;
+        
+        setHash(ROWS, COLS, gameMode, moves + nextMove);
     }
 
     function updateStatus(state) {
@@ -353,13 +408,21 @@
         statusBox.className = 'status-box';
 
         let modePrefix = isReviewMode ? "[검토] " : "";
-        let currentPlayerStr = (state.moveCount % 2 === 0) ? "플레이어 1" : (gameMode === 'PVC' ? "컴퓨터" : "플레이어 2");
+        if (currentMoveIndex < state.fullMovesLen && !isReviewMode) {
+            modePrefix = "[복기] ";
+        }
 
         if (state.gameOver) {
-            let winnerStr = (state.loser === 1) ? (gameMode === 'PVC' ? "컴퓨터" : "플레이어 2") : "플레이어 1";
+            let winnerStr = "";
+            if (state.loser === 1) {
+                winnerStr = (gameMode === 'PVC') ? "컴퓨터" : "플레이어 2";
+            } else {
+                winnerStr = "플레이어 1";
+            }
             statusText.innerText = `${modePrefix}${winnerStr} 승리! 🏆 (총 ${state.moveCount}수)`;
             statusBox.classList.add('winner');
         } else {
+            let currentPlayerStr = (state.moveCount % 2 === 0) ? "플레이어 1" : (gameMode === 'PVC' ? "컴퓨터" : "플레이어 2");
             statusText.innerText = `${modePrefix}${currentPlayerStr}의 차례 (수순: ${state.moveCount})`;
         }
     }
@@ -379,15 +442,23 @@
     }
 
     function solve(heights) {
-        const key = heights.join(',');
-        if (key === "1" + ",0".repeat(COLS - 1)) return null;
+        const key = `${ROWS}:${heights.join(',')}`;
+        
+        // 독초 1개만 남아있는 패배 상태 판정
+        if (heights[0] === 1 && (COLS === 1 || heights[1] === 0)) {
+            return null;
+        }
         if (memo.has(key)) return memo.get(key);
 
         for (let c = 0; c < COLS; c++) {
             for (let h = 1; h <= heights[c]; h++) {
-                if (c === 0 && h === 1) continue;
+                if (c === 0 && h === 1) continue; // 독초 선택 금지
+
                 let next = [...heights];
-                for (let i = c; i < COLS; i++) next[i] = Math.min(next[i], h - 1);
+                for (let i = c; i < COLS; i++) {
+                    next[i] = Math.min(next[i], h - 1);
+                }
+
                 if (!solve(next)) {
                     const move = { r: ROWS - h, c: c };
                     memo.set(key, move);
@@ -395,18 +466,34 @@
                 }
             }
         }
+
         memo.set(key, null);
         return null;
     }
 
-    function proComputerTurn(state) {
+    function proComputerTurn() {
+        aiTimer = null;
+        let parsed = parseHash();
+        if (!parsed) return;
+
+        let maxMoves = parsed.moves.length / 2;
+        // 안전 검증: 현재 컴퓨터 턴이고 최신 수순 상태인가?
+        if (gameMode !== 'PVC' || currentMoveIndex !== maxMoves || currentMoveIndex % 2 !== 1) {
+            return;
+        }
+
+        let state = computeState(parsed, currentMoveIndex);
+        if (state.gameOver) return;
+
         let heights = getHeightsFromState(state.eaten);
         let move = solve(heights);
         let r, c;
 
         if (move) {
-            r = move.r; c = move.c;
+            r = move.r; 
+            c = move.c;
         } else {
+            // 필패 상태 시 독초가 아닌 가능한 랜덤 칸 선택
             let av = [];
             for (let tr = 0; tr < ROWS; tr++) {
                 for (let tc = 0; tc < COLS; tc++) {
@@ -415,13 +502,16 @@
                     }
                 }
             }
-            let sel = av.length ? av[Math.floor(Math.random() * av.length)] : { r: ROWS - 1, c: 0 };
-            r = sel.r; c = sel.c;
+            if (av.length > 0) {
+                let sel = av[Math.floor(Math.random() * av.length)];
+                r = sel.r; c = sel.c;
+            } else {
+                r = ROWS - 1; c = 0; // 독초 강제 선택
+            }
         }
 
-        let parsed = parseHash();
         let moves = parsed.moves.substring(0, currentMoveIndex * 2);
-        window.location.hash = `r${ROWS}c${COLS}_` + moves + chars[r] + chars[c];
+        setHash(ROWS, COLS, 'PVC', moves + chars[r] + chars[c]);
     }
 
     // --- 수순 / 검토 / 링크 복사 기능 ---
@@ -434,13 +524,18 @@
 
     function goNextMove() {
         let parsed = parseHash();
-        if (parsed && currentMoveIndex < parsed.moves.length / 2) {
-            currentMoveIndex++;
-            render();
+        if (parsed) {
+            let maxMoves = parsed.moves.length / 2;
+            if (currentMoveIndex < maxMoves) {
+                currentMoveIndex++;
+                render();
+            }
         }
     }
 
-    function handleInputEnter(e) { if (e.key === 'Enter') document.getElementById('move-input').blur(); }
+    function handleInputEnter(e) { 
+        if (e.key === 'Enter') document.getElementById('move-input').blur(); 
+    }
 
     function jumpToMove() {
         let parsed = parseHash();
@@ -461,16 +556,19 @@
             savedReviewState = { hash: window.location.hash, index: currentMoveIndex };
             btn.classList.add('active');
             btn.innerText = '🛑 검토 종료';
-
-            let parsed = parseHash();
-            let moves = parsed.moves.substring(0, currentMoveIndex * 2);
-            window.location.hash = `r${ROWS}c${COLS}_` + moves;
         } else {
-            window.location.hash = savedReviewState.hash || '';
-            currentMoveIndex = savedReviewState.index;
-            savedReviewState = null;
             btn.classList.remove('active');
             btn.innerText = '🔍 검토';
+            if (savedReviewState) {
+                let targetHash = savedReviewState.hash;
+                let targetIndex = savedReviewState.index;
+                savedReviewState = null;
+                if (targetHash) {
+                    window.location.hash = targetHash;
+                }
+                currentMoveIndex = targetIndex;
+                render();
+            }
         }
     }
 
@@ -478,27 +576,57 @@
         navigator.clipboard.writeText(window.location.href).then(() => {
             alert('게임 링크가 클립보드에 복사되었습니다! 상대방에게 전달하세요.');
         }).catch(() => {
-            alert('링크 복사에 실패했습니다.');
+            let dummy = document.createElement('input');
+            document.body.appendChild(dummy);
+            dummy.value = window.location.href;
+            dummy.select();
+            document.execCommand('copy');
+            document.body.removeChild(dummy);
+            alert('게임 링크가 클립보드에 복사되었습니다!');
         });
     }
 
     function backToMenu() {
+        if (aiTimer) {
+            clearTimeout(aiTimer);
+            aiTimer = null;
+        }
         window.location.hash = '';
         document.getElementById('menu').classList.remove('hidden');
         document.getElementById('game-area').classList.add('hidden');
     }
 
+    // --- 이벤트 리스너 ---
     window.addEventListener('hashchange', () => {
         let parsed = parseHash();
         if (parsed) {
-            currentMoveIndex = parsed.moves.length / 2;
+            if (parsed.mode) gameMode = parsed.mode;
+            let maxMoves = parsed.moves.length / 2;
+            if (currentMoveIndex > maxMoves) {
+                currentMoveIndex = maxMoves;
+            } else if (!isReviewMode) {
+                currentMoveIndex = maxMoves;
+            }
         }
         render();
+    });
+
+    window.addEventListener('keydown', (e) => {
+        if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+        let gameArea = document.getElementById('game-area');
+        if (gameArea && !gameArea.classList.contains('hidden')) {
+            if (e.key === 'ArrowLeft') {
+                goPrevMove();
+            } else if (e.key === 'ArrowRight') {
+                goNextMove();
+            }
+        }
     });
 
     window.onload = () => {
         let parsed = parseHash();
         if (parsed) {
+            if (parsed.mode) gameMode = parsed.mode;
             currentMoveIndex = parsed.moves.length / 2;
         }
         render();
