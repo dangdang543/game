@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>URL 공유 Chomp Pro</title>
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Malgun Gothic', sans-serif;
+            background-color: #000000;
+            color: #f3f4f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background: #1a1a1a;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: row;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 30px;
+            max-width: 900px;
+            width: 100%;
+        }
+
+        #menu {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .setting-group label {
+            display: block;
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #d1d5db;
+            margin-bottom: 10px;
+        }
+
+        input[type="number"] {
+            width: 70px;
+            height: 45px;
+            font-size: 1.2rem;
+            border: 2px solid #4b5563;
+            border-radius: 8px;
+            text-align: center;
+            background: #1f2937;
+            color: #f3f4f6;
+        }
+
+        #game-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+        }
+
+        #grid-container {
+            background-color: #3e2723;
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            max-width: 100%;
+            overflow-x: auto;
+            border: 2px solid #5d4037;
+        }
+
+        #grid {
+            display: grid;
+            gap: 4px;
+            margin: 0 auto;
+        }
+
+        .cell {
+            width: 45px;
+            height: 45px;
+            background-color: #8d6e63;
+            border-radius: 4px;
+            transition: all 0.2s;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #fff;
+            font-size: 12px;
+        }
+
+        .cell:hover { opacity: 0.85; }
+        .cell.eaten { opacity: 0; pointer-events: none; }
+        .cell.poison { background-color: #d32f2f; position: relative; }
+        .cell.poison::after { content: "☠️"; position: absolute; font-size: 1.2rem; }
+
+        .side-panel {
+            flex: 0 0 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+        }
+
+        .status-box {
+            padding: 15px;
+            background: #2d2d2d;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            text-align: center;
+            color: #f3f4f6;
+            border: 1px solid transparent;
+        }
+
+        .status-box.winner { background: #064e3b; border-color: #059669; color: #a7f3d0; }
+
+        .controls-container { display: flex; flex-direction: column; gap: 10px; }
+        .row-1, .row-2 { display: flex; gap: 8px; width: 100%; justify-content: space-between; }
+
+        button {
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            padding: 12px 6px;
+            font-weight: bold;
+            transition: all 0.2s;
+            -webkit-tap-highlight-color: transparent;
+            font-family: inherit;
+        }
+
+        button:active { transform: scale(0.96); }
+        .row-1 > button { flex: 1; font-size: 18px; }
+        .row-2 > button { flex: 1; font-size: 13px; letter-spacing: -0.5px; }
+
+        .btn-primary { background-color: #4f46e5; color: white; }
+        .btn-info { background-color: #0284c7; color: white; }
+        .btn-nav { background-color: #4b5563; color: white; }
+        .btn-secondary { background-color: #6b7280; color: white; }
+        .btn-review { background-color: #9333ea; color: white; }
+        .btn-review.active { background-color: #dc2626; animation: pulse 1.5s infinite; }
+
+        #move-input {
+            flex: 2; width: 100%; text-align: center; font-size: 18px; font-weight: bold;
+            border: 2px solid #555; border-radius: 6px; outline: none;
+            background: #1f2937; color: #f3f4f6;
+        }
+
+        .hidden { display: none !important; }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
+        }
+
+        @media (max-width: 800px) {
+            .container {
+                flex-direction: column;
+                align-items: center;
+                padding: 15px;
+            }
+            .side-panel { flex: none; width: 100%; }
+            .cell { width: 38px; height: 38px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="menu">
+        <h1 style="color: #f3f4f6; margin-top:0;">🍫 Chomp</h1>
+        <div class="setting-group">
+            <label>게임판 크기 (최대 7x7)</label>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                <input type="number" id="rows" value="7" min="2" max="7">
+                <span style="font-size: 1.2rem;">X</span>
+                <input type="number" id="cols" value="7" min="2" max="7">
+            </div>
+        </div>
+        <button class="btn-primary" onclick="startNewGame('PVP')">👥 사람 vs 사람 (URL 공유)</button>
+        <button class="btn-info" onclick="startNewGame('PVC')">🤖 컴퓨터와 대결</button>
+    </div>
+
+    <div id="game-area" class="hidden">
+        <div id="grid-container">
+            <div id="grid"></div>
+        </div>
+
+        <div class="side-panel">
+            <div class="status-box" id="status-box">
+                <span id="status-text">대기 중</span>
+            </div>
+
+            <div class="controls-container">
+                <div class="row-1">
+                    <button id="btn-prev-move" class="btn-nav" onclick="goPrevMove()" title="왼쪽 방향키 (◀)">◀</button>
+                    <input type="number" id="move-input" min="0" value="0" onkeydown="handleInputEnter(event)" onblur="jumpToMove()">
+                    <button id="btn-next-move" class="btn-nav" onclick="goNextMove()" title="오른쪽 방향키 (▶)">▶</button>
+                </div>
+                <div class="row-2">
+                    <button class="btn-primary" onclick="copyLink()">🔗 링크복사</button>
+                    <button id="btn-review" class="btn-review" onclick="toggleReviewMode()">🔍 검토</button>
+                    <button class="btn-secondary" onclick="backToMenu()">🏠 메뉴로</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const chars = 'abcdefghijklmno';
+    let ROWS = 7, COLS = 7;
+    let gameMode = 'PVP';
+    let currentMoveIndex = 0;
+    let isReviewMode = false;
+    let savedReviewState = null;
+    let memo = new Map();
+
+    function startNewGame(mode) {
+        ROWS = Math.min(parseInt(document.getElementById('rows').value), 7);
+        COLS = Math.min(parseInt(document.getElementById('cols').value), 7);
+        gameMode = mode;
+        
+        // Hash 초기화: r{rows}c{cols}_ 형식
+        window.location.hash = `r${ROWS}c${COLS}_`;
+    }
+
+    function parseHash() {
+        let hash = window.location.hash.substring(1);
+        if (!hash) return null;
+
+        let match = hash.match(/^r(\d)c(\d)_(.*)$/);
+        if (!match) return null;
+
+        return {
+            rows: parseInt(match[1]),
+            cols: parseInt(match[2]),
+            moves: match[3].replace(/[^a-o]/g, '')
+        };
+    }
+
+    function computeState(parsed, maxMoves) {
+        if (!parsed) return null;
+
+        const rows = parsed.rows;
+        const cols = parsed.cols;
+        let moves = parsed.moves;
+
+        if (maxMoves !== undefined) {
+            moves = moves.substring(0, maxMoves * 2);
+        }
+
+        let eaten = Array.from({ length: rows }, () => Array(cols).fill(false));
+        let moveCount = 0;
+        let gameOver = false;
+        let loser = null;
+
+        for (let i = 0; i + 1 < moves.length; i += 2) {
+            if (gameOver) break;
+
+            let r = chars.indexOf(moves[i]);
+            let c = chars.indexOf(moves[i + 1]);
+
+            if (r < 0 || r >= rows || c < 0 || c >= cols || eaten[r][c]) break;
+
+            // Chomp 적용
+            for (let tr = 0; tr <= r; tr++) {
+                for (let tc = c; tc < cols; tc++) {
+                    eaten[tr][tc] = true;
+                }
+            }
+
+            moveCount++;
+
+            if (r === rows - 1 && c === 0) {
+                gameOver = true;
+                loser = moveCount % 2 === 1 ? 1 : 2; // 독초를 먹은 플레이어 패배
+            }
+        }
+
+        return { rows, cols, eaten, moveCount, gameOver, loser, fullMovesLen: parsed.moves.length / 2 };
+    }
+
+    function render() {
+        let parsed = parseHash();
+        if (!parsed) {
+            document.getElementById('menu').classList.remove('hidden');
+            document.getElementById('game-area').classList.add('hidden');
+            return;
+        }
+
+        document.getElementById('menu').classList.add('hidden');
+        document.getElementById('game-area').classList.remove('hidden');
+
+        ROWS = parsed.rows;
+        COLS = parsed.cols;
+
+        let state = computeState(parsed, currentMoveIndex);
+        
+        const cellSize = (window.innerWidth < 450) ? 38 : 45;
+        const grid = document.getElementById('grid');
+        grid.style.gridTemplateColumns = `repeat(${COLS}, ${cellSize}px)`;
+        grid.style.width = `${COLS * cellSize + (COLS - 1) * 4}px`;
+        grid.innerHTML = '';
+
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const cell = document.createElement('div');
+                let isPoison = (r === ROWS - 1 && c === 0);
+                cell.className = 'cell' + (isPoison ? ' poison' : '') + (state.eaten[r][c] ? ' eaten' : '');
+                cell.onclick = () => handleChomp(r, c);
+                grid.appendChild(cell);
+            }
+        }
+
+        updateStatus(state);
+        document.getElementById('move-input').value = currentMoveIndex;
+
+        // PVC 모드일 때 AI 턴 자동 실행
+        if (gameMode === 'PVC' && !state.gameOver && currentMoveIndex === state.fullMovesLen && (currentMoveIndex % 2 === 1)) {
+            document.getElementById('status-text').innerText = "AI 계산 중...";
+            setTimeout(() => proComputerTurn(state), 300);
+        }
+    }
+
+    function handleChomp(r, c) {
+        let parsed = parseHash();
+        let state = computeState(parsed, currentMoveIndex);
+
+        if (state.gameOver || state.eaten[r][c]) return;
+        if (gameMode === 'PVC' && currentMoveIndex % 2 === 1) return; // AI 순서 시 반응 안 함
+
+        let moves = parsed.moves.substring(0, currentMoveIndex * 2);
+        let nextMove = chars[r] + chars[c];
+        window.location.hash = `r${ROWS}c${COLS}_` + moves + nextMove;
+    }
+
+    function updateStatus(state) {
+        const statusBox = document.getElementById('status-box');
+        const statusText = document.getElementById('status-text');
+        statusBox.className = 'status-box';
+
+        let modePrefix = isReviewMode ? "[검토] " : "";
+        let currentPlayerStr = (state.moveCount % 2 === 0) ? "플레이어 1" : (gameMode === 'PVC' ? "컴퓨터" : "플레이어 2");
+
+        if (state.gameOver) {
+            let winnerStr = (state.loser === 1) ? (gameMode === 'PVC' ? "컴퓨터" : "플레이어 2") : "플레이어 1";
+            statusText.innerText = `${modePrefix}${winnerStr} 승리! 🏆 (총 ${state.moveCount}수)`;
+            statusBox.classList.add('winner');
+        } else {
+            statusText.innerText = `${modePrefix}${currentPlayerStr}의 차례 (수순: ${state.moveCount})`;
+        }
+    }
+
+    // --- AI 로직 ---
+    function getHeightsFromState(eaten) {
+        let h = new Array(COLS).fill(0);
+        for (let c = 0; c < COLS; c++) {
+            for (let r = 0; r < ROWS; r++) {
+                if (!eaten[r][c]) {
+                    h[c] = ROWS - r;
+                    break;
+                }
+            }
+        }
+        return h;
+    }
+
+    function solve(heights) {
+        const key = heights.join(',');
+        if (key === "1" + ",0".repeat(COLS - 1)) return null;
+        if (memo.has(key)) return memo.get(key);
+
+        for (let c = 0; c < COLS; c++) {
+            for (let h = 1; h <= heights[c]; h++) {
+                if (c === 0 && h === 1) continue;
+                let next = [...heights];
+                for (let i = c; i < COLS; i++) next[i] = Math.min(next[i], h - 1);
+                if (!solve(next)) {
+                    const move = { r: ROWS - h, c: c };
+                    memo.set(key, move);
+                    return move;
+                }
+            }
+        }
+        memo.set(key, null);
+        return null;
+    }
+
+    function proComputerTurn(state) {
+        let heights = getHeightsFromState(state.eaten);
+        let move = solve(heights);
+        let r, c;
+
+        if (move) {
+            r = move.r; c = move.c;
+        } else {
+            let av = [];
+            for (let tr = 0; tr < ROWS; tr++) {
+                for (let tc = 0; tc < COLS; tc++) {
+                    if (!state.eaten[tr][tc] && !(tr === ROWS - 1 && tc === 0)) {
+                        av.push({ r: tr, c: tc });
+                    }
+                }
+            }
+            let sel = av.length ? av[Math.floor(Math.random() * av.length)] : { r: ROWS - 1, c: 0 };
+            r = sel.r; c = sel.c;
+        }
+
+        let parsed = parseHash();
+        let moves = parsed.moves.substring(0, currentMoveIndex * 2);
+        window.location.hash = `r${ROWS}c${COLS}_` + moves + chars[r] + chars[c];
+    }
+
+    // --- 수순 / 검토 / 링크 복사 기능 ---
+    function goPrevMove() {
+        if (currentMoveIndex > 0) {
+            currentMoveIndex--;
+            render();
+        }
+    }
+
+    function goNextMove() {
+        let parsed = parseHash();
+        if (parsed && currentMoveIndex < parsed.moves.length / 2) {
+            currentMoveIndex++;
+            render();
+        }
+    }
+
+    function handleInputEnter(e) { if (e.key === 'Enter') document.getElementById('move-input').blur(); }
+
+    function jumpToMove() {
+        let parsed = parseHash();
+        if (!parsed) return;
+        let target = parseInt(document.getElementById('move-input').value);
+        let maxMoves = parsed.moves.length / 2;
+        if (isNaN(target) || target < 0) target = 0;
+        if (target > maxMoves) target = maxMoves;
+        currentMoveIndex = target;
+        render();
+    }
+
+    function toggleReviewMode() {
+        let btn = document.getElementById('btn-review');
+        isReviewMode = !isReviewMode;
+
+        if (isReviewMode) {
+            savedReviewState = { hash: window.location.hash, index: currentMoveIndex };
+            btn.classList.add('active');
+            btn.innerText = '🛑 검토 종료';
+
+            let parsed = parseHash();
+            let moves = parsed.moves.substring(0, currentMoveIndex * 2);
+            window.location.hash = `r${ROWS}c${COLS}_` + moves;
+        } else {
+            window.location.hash = savedReviewState.hash || '';
+            currentMoveIndex = savedReviewState.index;
+            savedReviewState = null;
+            btn.classList.remove('active');
+            btn.innerText = '🔍 검토';
+        }
+    }
+
+    function copyLink() {
+        navigator.clipboard.writeText(window.location.href).then(() => {
+            alert('게임 링크가 클립보드에 복사되었습니다! 상대방에게 전달하세요.');
+        }).catch(() => {
+            alert('링크 복사에 실패했습니다.');
+        });
+    }
+
+    function backToMenu() {
+        window.location.hash = '';
+        document.getElementById('menu').classList.remove('hidden');
+        document.getElementById('game-area').classList.add('hidden');
+    }
+
+    window.addEventListener('hashchange', () => {
+        let parsed = parseHash();
+        if (parsed) {
+            currentMoveIndex = parsed.moves.length / 2;
+        }
+        render();
+    });
+
+    window.onload = () => {
+        let parsed = parseHash();
+        if (parsed) {
+            currentMoveIndex = parsed.moves.length / 2;
+        }
+        render();
+    };
+</script>
+</body>
+</html>
