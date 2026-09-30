@@ -544,7 +544,7 @@
         return { setupB, setupW, moves, s_val, l_val, sz_val, startingMoveNum, memo };
     }
 
-    // 해시 빌드
+    // 해시 빌드 (이 부분을 수정했습니다)
     function buildHash(setupB, setupW, moves, sz = 19, s = -1, memo = "") {
         let hash = "";
         if (setupB || setupW) {
@@ -561,7 +561,11 @@
             hash += ` s=${s}`;
         }
         if (memo) {
-            hash += ` memo=${encodeURIComponent(memo)}`;
+            // 기본 encodeURIComponent는 ! ' ( ) * 를 변환하지 않으므로, 이 문자들도 수동으로 퍼센트 인코딩 처리합니다.
+            let encodedMemo = encodeURIComponent(memo).replace(/[!'()*]/g, function(c) {
+                return '%' + c.charCodeAt(0).toString(16).toUpperCase();
+            });
+            hash += ` memo=${encodedMemo}`;
         }
         return hash;
     }
